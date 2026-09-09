@@ -1,0 +1,61 @@
+.map-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background-color: #EFEFEF; /* Light map tile base */
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-tiles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    linear-gradient(to right, #e2e2e2 1px, transparent 1px),
+    linear-gradient(to bottom, #e2e2e2 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.5;
+}
+
+.route-line {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.route-path-bg {
+  fill: none;
+  stroke: var(--risk-low);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.route-path-segments {
+  fill: none;
+  stroke: var(--risk-high);
+  stroke-width: 8;
+  stroke-dasharray: 40 20 15 50;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.map-overlay-text {
+  position: relative;
+  z-index: 10;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  font-weight: 500;
+  color: var(--color-grey-dark);
+  backdrop-filter: blur(4px);
+}

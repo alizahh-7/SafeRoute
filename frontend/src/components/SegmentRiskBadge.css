@@ -1,0 +1,35 @@
+.risk-badge {
+  color: var(--color-black);
+}
+
+.risk-low {
+  background-color: var(--risk-low);
+}
+
+.risk-medium {
+  background-color: var(--risk-medium);
+}
+
+.risk-high {
+  background-color: var(--risk-high);
+}
+
+.risk-severe {
+  background-color: var(--risk-severe);
+  color: var(--color-white);
+}
+
+.size-sm {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+}
+
+.size-md {
+  padding: 6px 16px;
+  font-size: 0.875rem;
+}
+
+.size-lg {
+  padding: 8px 24px;
+  font-size: 1rem;
+}
