@@ -237,8 +237,8 @@ const Home = () => {
                 </p>
               </div>
               <div className="shrink-0 flex items-center gap-space-md">
-                <img className="w-72 h-44 object-cover rounded-DEFAULT shadow-md" alt="A clean modern data operations center in Hyderabad" src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=800" />
-                <img className="hidden sm:block w-72 h-44 object-cover rounded-DEFAULT shadow-md" alt="Street level urban road in Hyderabad" src="https://images.unsplash.com/photo-1621217030560-61f434220b33?auto=format&fit=crop&q=80&w=800" />
+                <img className="w-72 h-44 object-cover rounded-DEFAULT shadow-md" alt="A clean modern data operations center in Hyderabad" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAny8gnM8g_xUXLWcSVonc4ppnGb0MB1sl-CHEOxJMayEH22aZSY8vahKZ1y58P4E4Z3GY1KqvaugHgVf9SODw4wWb5XYkq31TzX3pOlkvG1L83RUq7JtTaP8u1XCjh3ve5AR3QhTxe6ye0KDk8cKaevodkn6ErFJEc-3phcwXzYvuhvmDdy5YQSaimBEgc3_qp8uWnq97gts-HObbOYtJ4pEmduK-7pZcWVY9JQkvpnQmqgo9C_Ns7zw" />
+                <img className="hidden sm:block w-72 h-44 object-cover rounded-DEFAULT shadow-md" alt="Street level urban road in Hyderabad" src="https://lh3.googleusercontent.com/aida-public/AB6AXuASK8PmlhY0VzTli1VYUrSDZo_scNk4h5QtbVEiUMDSSJvv07kpdnIfspv9-TJR9jQejENl-APrQe_xnwoIl6qeBDZLGTBjiG7CpYXUFt16w7ghB4IEq208XECXU4-R86EQz75hqP5Y-sSh1TgTP1em0AWE6xFlos1QfpewcIAh9VOsNncAtbtOoXaTNxjZyxU4GvNnOQLS22_foHmsODZNDnnV20nTmJVsaSM2rP3ygkZzQkeh5pg-ew" />
               </div>
             </div>
           </div>

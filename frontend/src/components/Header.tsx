@@ -25,7 +25,7 @@ const Header = () => {
           <NavLink to="/" className={({ isActive }) => `whitespace-nowrap px-space-md py-space-xs font-body-sm transition-colors rounded-full ${isActive ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}>Overview</NavLink>
           <NavLink to="/route-planner" className={({ isActive }) => `whitespace-nowrap px-space-md py-space-xs font-body-sm transition-colors rounded-full ${isActive ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}>Safe Route Finder</NavLink>
           <NavLink to="/route" className={({ isActive }) => `whitespace-nowrap px-space-md py-space-xs font-body-sm transition-colors rounded-full ${isActive ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}>Live Safety Map &amp; Results</NavLink>
-          <Link to="/#data-feeds" className="whitespace-nowrap px-space-md py-space-xs rounded-full font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors">Analytics Heatmap</Link>
+          <Link to="/analytics" className="whitespace-nowrap px-space-md py-space-xs rounded-full font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors">Analytics Heatmap</Link>
           <Link to="/about" className="whitespace-nowrap px-space-md py-space-xs rounded-full font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors">System Methodology</Link>
           <a href="#site-footer" className="whitespace-nowrap px-space-md py-space-xs rounded-full font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors">Team</a>
         </nav>
