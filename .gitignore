@@ -6,3 +6,4 @@ venv/
 .ipynb_checkpoints/
 data/raw/*.csv
 !data/raw/.gitkeep
+.venv/

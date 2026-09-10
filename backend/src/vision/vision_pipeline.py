@@ -13,7 +13,7 @@ import random
 
 import requests
 
-from detect import load_model, detect_damage, severity_from_detections
+from src.vision.detect import load_model, detect_damage, severity_from_detections
 
 
 MAPILLARY_TOKEN = os.getenv("MAPILLARY_TOKEN")

@@ -2,7 +2,10 @@ import pandas as pd
 from src.data_pipeline.segmentation import segment_route, haversine_m
 from src.risk_engine.historical_score import compute_historical_score, load_black_spots, load_crash_data
 from src.risk_engine.fusion import fuse_segment_risk
+from fastapi.testclient import TestClient
+from api.main import app
 
+client = TestClient(app)
 
 def test_haversine_distance_is_positive():
     d = haversine_m((17.371, 78.499), (17.375, 78.495))
@@ -38,3 +41,14 @@ def test_fusion_combines_signals_correctly():
     result = fuse_segment_risk(segment)
     assert result["final_score"] > segment["historical_score"]
     assert isinstance(result["explanation"], str)
+    
+def test_route_risk_endpoint_returns_valid_response():
+    response = client.post("/route-risk", json={
+        "origin": "Malakpet, Hyderabad",
+        "destination": "Khairatabad, Hyderabad"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert "route_total_risk" in data
+    assert len(data["segments"]) > 0
+    assert "final_score" in data["segments"][0]
