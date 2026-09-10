@@ -1,6 +1,8 @@
 import { MapPin, Navigation, Car, Bike, Ambulance, Search, Clock, CloudRain, Star, ShieldCheck, Zap, Cpu, AlertTriangle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const RoutePlanner = () => {
+  const navigate = useNavigate();
   return (
     <div className="w-full pt-20 bg-background min-h-screen pb-space-3xl">
       <div className="max-w-[1440px] mx-auto px-layout-margin-mobile md:px-layout-margin-tablet lg:px-layout-margin-desktop pt-space-xl">
@@ -115,7 +117,7 @@ const RoutePlanner = () => {
               </div>
             </div>
 
-            <button className="w-full bg-on-surface text-surface py-space-md rounded-full font-headline-sm text-headline-sm flex items-center justify-center gap-space-sm hover:bg-on-surface-variant transition-colors shadow-md hover:shadow-lg hover:-translate-y-0.5">
+            <button onClick={() => navigate('/route')} className="w-full bg-on-surface text-surface py-space-md rounded-full font-headline-sm text-headline-sm flex items-center justify-center gap-space-sm hover:bg-on-surface-variant transition-colors shadow-md hover:shadow-lg hover:-translate-y-0.5">
               <Navigation size={20} /> Analyze Corridor Safety & Fetch Routes
             </button>
           </div>
@@ -165,7 +167,7 @@ const RoutePlanner = () => {
                   <div className="font-label-caps-micro text-label-caps-micro text-secondary-container font-bold tracking-widest">LIVE DROPOUT GRID</div>
                   <div className="text-surface font-headline-sm text-headline-sm drop-shadow-md">Hyderabad Metrowide<br/>Grid</div>
                 </div>
-                <button className="bg-surface-container-lowest text-on-surface px-space-md py-space-xs rounded-full font-label-code-md text-label-code-md flex items-center gap-space-2xs hover:bg-surface-container transition-colors shadow-sm group-hover:scale-105">
+                <button onClick={() => navigate('/analytics')} className="bg-surface-container-lowest text-on-surface px-space-md py-space-xs rounded-full font-label-code-md text-label-code-md flex items-center gap-space-2xs hover:bg-surface-container transition-colors shadow-sm group-hover:scale-105">
                   View Heatmap <MapPin size={14}/>
                 </button>
               </div>
@@ -283,7 +285,7 @@ const RoutePlanner = () => {
             </div>
             <h4 className="font-headline-sm text-headline-sm text-on-surface mb-space-xs">No Saved Commutes Yet</h4>
             <p className="font-body-sm text-body-sm text-on-surface-variant mb-space-lg max-w-[240px]">Star your daily routes to receive automated 30-minute pre-depart alerts via SMS and WhatsApp API.</p>
-            <button className="bg-surface-container-low border border-surface-variant text-on-surface px-space-lg py-space-sm rounded-full font-label-code-md text-label-code-md font-semibold hover:bg-surface-container transition-colors shadow-sm">
+            <button onClick={() => navigate('/saved-corridors')} className="bg-surface-container-low border border-surface-variant text-on-surface px-space-lg py-space-sm rounded-full font-label-code-md text-label-code-md font-semibold hover:bg-surface-container transition-colors shadow-sm">
               + Add Daily Commute
             </button>
 

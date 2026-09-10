@@ -1,160 +1,30 @@
-import { motion } from "framer-motion";
-import { Database, Eye, Newspaper, ShieldAlert, ArrowDown } from "lucide-react";
-import { ASSETS } from "../assets.config";
-import "./About.css";
+import { useEffect } from "react";
+import { ArrowRight, BrainCircuit, CloudRain, Eye, MapPinned, Route, ShieldCheck, TriangleAlert } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Link } from "react-router-dom";
 
-const FlowDiagram = () => (
-  <div className="flow-diagram my-16 p-8 bg-white rounded-[32px] shadow-sm border border-grey-light">
-    <h3 className="text-2xl mb-8 text-center">Score Computation Flow</h3>
-    <div className="flex flex-col items-center">
-      <div className="flex gap-4 mb-4">
-        <div className="pill bg-grey-light">Historical Data</div>
-        <div className="pill bg-grey-light">Live Weather</div>
-        <div className="pill bg-grey-light">Traffic</div>
-        <div className="pill bg-grey-light">Vision</div>
-      </div>
-      
-      <motion.div 
-        initial={{ height: 0 }}
-        whileInView={{ height: 40 }}
-        viewport={{ once: true }}
-        transition={{ duration: 1, ease: "easeOut" }}
-        className="w-1 bg-black mb-4"
-      />
-      
-      <div className="card bg-black text-white px-8 py-4 mb-4 z-10 text-xl font-bold">
-        Fusion Engine
-      </div>
-      
-      <motion.div 
-        initial={{ height: 0 }}
-        whileInView={{ height: 40 }}
-        viewport={{ once: true }}
-        transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
-        className="w-1 bg-black mb-4 relative"
-      >
-        <ArrowDown size={24} className="absolute -bottom-4 left-[-10px]" />
-      </motion.div>
-      
-      <div className="card border-2 border-risk-high text-risk-high px-8 py-4 z-10 text-2xl font-bold mt-4">
-        Final Segment Risk Score
-      </div>
-    </div>
-  </div>
-);
+const shell = "w-full max-w-[1440px] mx-auto px-layout-margin-mobile md:px-layout-margin-tablet lg:px-layout-margin-desktop";
+const steps: Array<[string, LucideIcon, string, string]> = [
+  ["01", MapPinned, "Understand the corridor", "SafeRoute decomposes an origin-to-destination request into 200–500m road links, preserving road class, junction geometry, bearing, and flyover metadata."],
+  ["02", BrainCircuit, "Weigh historical harm", "Each link is contextualized against the IIT Delhi TRIPP crash registry across 114 Telangana corridors—so an apparently short route is never judged by distance alone."],
+  ["03", Eye, "Read the road surface", "YOLOv8 vision signals assess nearby Indian road imagery for potholes, longitudinal cracking, and alligator damage. Sparse coverage is disclosed rather than guessed."],
+  ["04", CloudRain, "Listen for live hazards", "Storm-basin telemetry, radar conditions, and civic incident advisories can change a corridor’s risk profile before a commuter enters it."],
+  ["05", Route, "Recommend the safer trade-off", "The risk-fusion engine compares viable routes and explains the safety, exposure, and time trade-offs behind its recommendation."],
+];
+const feeds = [
+  ["Historical crash evidence", "IIT Delhi TRIPP", "Verified blackspot weighting and fatality-equivalent exposure."],
+  ["Road-surface vision", "YOLOv8 · RDD2022 India", "Image-derived pothole, crack, and surface-distress signals."],
+  ["Hydro-meteorological alerts", "GHMC · IMD", "Waterlogging basin, rain radar, and underpass-risk context."],
+  ["Civic disruption advisories", "News & traffic feeds", "Time-sensitive closures, barricades, and incident context."],
+];
 
-const About = () => {
-  const itemVariants: any = {
-    hidden: { opacity: 0, y: 30 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
-  };
-
-  return (
-    <div className="about-page">
-      {/* Hero */}
-      <section className="section-padding bg-black text-white full-bleed text-center">
-        <div className="container max-w-3xl mx-auto">
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-5xl mb-6 text-white"
-          >
-            The intelligence behind the route.
-          </motion.h1>
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-xl text-grey-muted"
-          >
-            SafeRoute is an AI-powered safety layer that augments traditional navigation. By combining multiple data streams into a single risk score, we help you make informed decisions before you drive.
-          </motion.p>
-        </div>
-      </section>
-
-      <section className="section-padding">
-        <div className="container max-w-4xl mx-auto">
-          
-          <FlowDiagram />
-
-          <h2 className="text-4xl mb-12 text-center mt-24">Data Sources in Depth</h2>
-
-          <div className="grid gap-16">
-            <motion.div variants={itemVariants} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-100px" }} className="flex flex-col md:flex-row gap-8 items-center">
-              <div className="flex-1">
-                <div className="icon-box bg-grey-light mb-4"><Database size={24} /></div>
-                <h3 className="text-2xl mb-2">Historical Crash Data</h3>
-                <p className="text-sm text-grey-dark font-mono mb-4">Dataset: IIT Delhi Mendeley · 114 Rows (Telangana)</p>
-                <p className="text-dark-grey text-lg">
-                  We use verified accident data to identify foundational blackspots. Severity is computed via a weighted formula (killed×5 + injured×1) to establish the base risk of any road segment before live factors are applied.
-                </p>
-              </div>
-              <div className="flex-1">
-                <img src={ASSETS.images.historicalData} alt="Data" className="rounded-[24px] shadow-xl w-full h-64 object-cover" />
-              </div>
-            </motion.div>
-
-            <motion.div variants={itemVariants} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-100px" }} className="flex flex-col md:flex-row-reverse gap-8 items-center">
-              <div className="flex-1">
-                <div className="icon-box bg-grey-light mb-4"><Eye size={24} /></div>
-                <h3 className="text-2xl mb-2">AI Road Damage Detection</h3>
-                <p className="text-sm text-grey-dark font-mono mb-4">Model: YOLOv8 · Training: RDD2022 India Subset</p>
-                <p className="text-dark-grey text-lg">
-                  Our vision model detects potholes and surface cracks from crowdsourced dashcam feeds, classifying severity into 4 levels. This acts as an active penalty on the base score.
-                </p>
-              </div>
-              <div className="flex-1">
-                <img src={ASSETS.images.aiVision} alt="Vision" className="rounded-[24px] shadow-xl w-full h-64 object-cover" />
-              </div>
-            </motion.div>
-            
-            <motion.div variants={itemVariants} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-100px" }} className="flex flex-col md:flex-row gap-8 items-center">
-              <div className="flex-1">
-                <div className="icon-box bg-grey-light mb-4"><Newspaper size={24} /></div>
-                <h3 className="text-2xl mb-2">Live News Advisory</h3>
-                <p className="text-sm text-grey-dark font-mono mb-4">Source: Google News RSS · Cadence: Near Real-time</p>
-                <p className="text-dark-grey text-lg">
-                  We parse local news feeds for keywords related to protests, major closures, or severe waterlogging. If relevant news intersects with your route, the system actively prompts a reroute.
-                </p>
-              </div>
-              <div className="flex-1">
-                <img src={ASSETS.images.newsAdvisory} alt="News" className="rounded-[24px] shadow-xl w-full h-64 object-cover" />
-              </div>
-            </motion.div>
-          </div>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="card bg-grey-light mt-24 limitations-card"
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <ShieldAlert size={20} color="var(--risk-high)" />
-              <h3 className="text-xl">System Limitations</h3>
-            </div>
-            <ul className="text-base text-dark-grey list-disc pl-5 space-y-2">
-              <li><strong>Data Coverage:</strong> Historical data is currently constrained to available open datasets specifically filtered for the Telangana region.</li>
-              <li><strong>Vision Model Constraints:</strong> YOLOv8 accuracy depends heavily on lighting conditions and camera angles from the available video feeds.</li>
-              <li><strong>Real-time Latency:</strong> RSS news scraping has an inherent delay and may not capture hyper-local incidents the exact minute they occur.</li>
-            </ul>
-          </motion.div>
-        </div>
-      </section>
-      
-      {/* Footer / Stack */}
-      <section className="section-padding border-t border-grey-light mt-12">
-        <div className="container text-center">
-          <h3 className="text-xl mb-6">Powered By</h3>
-          <div className="flex flex-wrap justify-center gap-4">
-            {['OpenRouteService', 'YOLOv8', 'Nominatim', 'Google News RSS', 'React', 'Framer Motion', 'Three.js'].map((tech) => (
-              <span key={tech} className="pill bg-white border border-grey-light shadow-sm px-4 py-2 text-sm font-semibold">{tech}</span>
-            ))}
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-};
-
-export default About;
+export default function About() {
+  useEffect(() => { document.title = "How SafeRoute Works | SafeRoute Telangana"; }, []);
+  return <div className="pt-20 pb-space-3xl bg-background min-h-screen">
+    <section className={`${shell} pt-space-2xl pb-space-xl`}><div className="grid grid-cols-1 lg:grid-cols-12 gap-space-2xl items-end"><div className="lg:col-span-8"><span className="font-label-caps-micro uppercase text-secondary">Civic safety intelligence, explained</span><h1 className="font-display-hero mt-space-sm max-w-4xl">How SafeRoute turns a route into an explainable safety decision.</h1><p className="font-body-lg text-on-surface-variant leading-relaxed max-w-3xl mt-space-lg">Traditional navigation optimizes for the fastest arrival. SafeRoute evaluates the corridor itself—historical crash exposure, road condition, weather-linked flooding, and live disruption signals—before it recommends a route.</p><div className="flex flex-wrap gap-space-sm mt-space-xl"><Link to="/route-planner" className="btn btn-primary"><Route size={17}/>Try the Safe Route Finder</Link><Link to="/methodology" className="btn btn-outline">Read the methodology <ArrowRight size={16}/></Link></div></div><aside className="lg:col-span-4 rounded-[1.75rem] bg-surface-container-low p-space-xl border border-surface-variant"><span className="font-label-caps-micro uppercase text-secondary">The principle</span><p className="font-headline-md mt-space-sm">A route is not safe merely because it is short.</p><p className="font-body-sm text-on-surface-variant mt-space-md">We make the factors behind a safer recommendation visible, so drivers and civic teams can understand the trade-off instead of receiving a black-box score.</p></aside></div></section>
+    <section className="bg-surface-container-low py-space-3xl"><div className={shell}><div className="flex flex-col lg:flex-row justify-between gap-space-lg items-start"><div><span className="font-label-caps-micro uppercase text-secondary">From request to recommendation</span><h2 className="font-headline-lg mt-space-xs">Five steps, one accountable route decision</h2></div><p className="font-body-md text-on-surface-variant max-w-xl">Every stage contributes evidence. When a signal is unavailable, the application can communicate that uncertainty rather than presenting generated examples as live data.</p></div><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-md mt-space-xl">{steps.map(([number, Icon, title, copy]) => <article key={number as string} className="bg-surface-container-lowest rounded-xl p-space-lg border border-surface-variant shadow-sm flex flex-col"><div className="flex items-center justify-between"><span className="w-9 h-9 rounded-full bg-secondary-container text-on-secondary-container grid place-items-center font-label-code-md">{number}</span><Icon size={20} className="text-secondary"/></div><h3 className="font-headline-sm mt-space-lg">{title}</h3><p className="font-body-sm text-on-surface-variant leading-relaxed mt-space-sm">{copy}</p></article>)}</div></div></section>
+    <section className={`${shell} py-space-3xl`}><div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl"><div className="lg:col-span-5"><span className="font-label-caps-micro uppercase text-secondary">Evidence, not a black box</span><h2 className="font-headline-lg mt-space-xs">The signals behind every safety recommendation</h2><p className="font-body-md text-on-surface-variant mt-space-md leading-relaxed">The product brings independently useful data sources together without pretending they are equally certain. Route detail and segment diagnostics make those contributors inspectable.</p><Link to="/analytics" className="inline-flex items-center gap-space-xs font-body-md font-semibold text-secondary mt-space-lg hover:underline">Explore live analytics <ArrowRight size={16}/></Link></div><div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-space-md">{feeds.map(([title, source, copy]) => <article key={title} className="p-space-lg rounded-xl bg-surface-container-low border border-surface-variant"><span className="font-label-caps-micro uppercase text-secondary">{source}</span><h3 className="font-headline-sm mt-space-sm">{title}</h3><p className="font-body-sm text-on-surface-variant mt-space-sm">{copy}</p></article>)}</div></div></section>
+    <section className="bg-on-surface text-surface py-space-3xl"><div className={shell}><div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-center"><div className="lg:col-span-7"><span className="font-label-caps-micro uppercase text-secondary-container">Designed for careful use</span><h2 className="font-headline-lg mt-space-sm">Safety intelligence has boundaries. We show those too.</h2><p className="font-body-md text-surface/75 mt-space-md max-w-2xl">SafeRoute is a condition-based risk system, not a collision prediction service. Camera coverage, telemetry delay, nighttime visibility, and sudden incidents are communicated as limitations within the product.</p></div><div className="lg:col-span-5 rounded-xl bg-surface/10 border border-surface/20 p-space-xl"><div className="flex gap-space-sm items-start"><TriangleAlert className="text-secondary-container shrink-0" size={22}/><div><h3 className="font-headline-sm">Review the safety boundaries</h3><p className="font-body-sm text-surface/75 mt-space-xs">See the operating constraints, engineering fallbacks, and source provenance used by this civic-tech prototype.</p><Link to="/methodology" className="inline-flex mt-space-md font-body-sm font-semibold text-secondary-container">Open boundary disclosures <ArrowRight size={15}/></Link></div></div></div></div></div></section>
+    <section className={`${shell} pt-space-3xl`}><div className="rounded-[1.75rem] bg-secondary-container/30 p-space-xl md:p-space-2xl flex flex-col md:flex-row justify-between gap-space-xl items-center"><div><span className="font-label-caps-micro uppercase text-secondary">Ready when you are</span><h2 className="font-headline-lg mt-space-xs">Choose a route with more context.</h2><p className="font-body-md text-on-surface-variant mt-space-sm">Start a corridor analysis, then inspect its segment-level evidence and alternates.</p></div><Link to="/route-planner" className="btn btn-primary shrink-0"><ShieldCheck size={17}/>Launch Safe Route</Link></div></section>
+  </div>;
+}

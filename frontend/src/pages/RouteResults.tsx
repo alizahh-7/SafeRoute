@@ -1,4 +1,5 @@
 import { Navigation, ShieldCheck, AlertTriangle, Zap, Download, Eye, CloudSun, CheckCircle } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const RouteResults = () => {
   return (
@@ -20,7 +21,8 @@ const RouteResults = () => {
               <div className="py-space-xs px-space-md bg-on-surface text-surface rounded-full flex items-center gap-space-2xs font-semibold shadow-sm"><ShieldCheck size={16}/> Viewing SafeRoute (Recommended)</div>
               <div className="py-space-xs px-space-md flex items-center gap-space-2xs cursor-pointer hover:text-on-surface transition-colors"><Navigation size={16}/> Compare Fastest</div>
             </div>
-            <div className="flex gap-space-sm justify-end">
+            <div className="flex gap-space-sm justify-end flex-wrap">
+              <Link to="/hazard-advisory" className="bg-[#F9EAEA] text-[#B93535] border border-[#B93535]/20 px-space-md py-space-xs rounded-full font-body-sm">Review active hazard</Link>
               <button className="bg-secondary-container text-on-secondary-container font-headline-sm text-headline-sm px-space-lg py-space-xs rounded-full flex items-center gap-space-2xs shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all"><Navigation size={18} className="rotate-45" /> Start Safe Turn-by-Turn</button>
               <button className="bg-surface-container-lowest text-on-surface border border-surface-variant px-space-md py-space-xs rounded-full shadow-sm hover:bg-surface-container transition-colors"><Download size={18}/></button>
             </div>
@@ -213,7 +215,7 @@ const RouteResults = () => {
                       <span className="flex items-center gap-space-2xs bg-surface-container-lowest border border-surface-variant px-space-xs py-space-2xs rounded"><Eye size={12}/> Vision: Clean asphalt</span>
                       <span className="flex items-center gap-space-2xs bg-surface-container-lowest border border-surface-variant px-space-xs py-space-2xs rounded"><AlertTriangle size={12}/> News: 0 Incidents</span>
                     </div>
-                    <div className="text-right font-label-code-md text-label-code-md font-bold text-secondary cursor-pointer hover:underline">View AI Breakdown →</div>
+                    <Link to="/segment/7e60db33" className="block text-right font-label-code-md text-label-code-md font-bold text-secondary hover:underline">View AI Breakdown →</Link>
                   </div>
                 </div>
 
@@ -234,7 +236,7 @@ const RouteResults = () => {
                       <span className="flex items-center gap-space-2xs bg-surface-container-lowest border border-surface-variant px-space-xs py-space-2xs rounded"><Eye size={12} className="text-[#D99B26]"/> Vision: D20 Cracks</span>
                       <span className="flex items-center gap-space-2xs bg-surface-container-lowest border border-surface-variant px-space-xs py-space-2xs rounded"><AlertTriangle size={12}/> News: Dense merge</span>
                     </div>
-                    <div className="text-right font-label-code-md text-label-code-md font-bold text-secondary cursor-pointer hover:underline">View AI Breakdown →</div>
+                    <Link to="/segment/8f71ec44" className="block text-right font-label-code-md text-label-code-md font-bold text-secondary hover:underline">View AI Breakdown →</Link>
                   </div>
                 </div>
 
@@ -255,7 +257,7 @@ const RouteResults = () => {
                       <span className="flex items-center gap-space-2xs bg-surface-container-lowest border border-surface-variant px-space-xs py-space-2xs rounded"><Eye size={12}/> Vision: Re-paved smooth</span>
                       <span className="flex items-center gap-space-2xs bg-surface-container-lowest border border-surface-variant px-space-xs py-space-2xs rounded"><CheckCircle size={12}/> News: Clear flow</span>
                     </div>
-                    <div className="text-right font-label-code-md text-label-code-md font-bold text-secondary cursor-pointer hover:underline">View AI Breakdown →</div>
+                    <Link to="/segment/9a82fd55" className="block text-right font-label-code-md text-label-code-md font-bold text-secondary hover:underline">View AI Breakdown →</Link>
                   </div>
                 </div>
               </div>

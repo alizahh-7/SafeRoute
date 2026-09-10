@@ -22,13 +22,53 @@ const Footer = () => {
               <Link to="/" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">Executive Overview</Link>
               <Link to="/route-planner" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">Multi-Criteria Router</Link>
               <Link to="/route" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">Live Corridors &amp; HUD</Link>
-              <Link to="/#data-feeds" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">Blackspot Density Map</Link>
+              <Link to="/analytics" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">Blackspot Density Map</Link>
+              <Link to="/saved-corridors" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">Saved Corridors</Link>
             </div>
             <div className="flex flex-col gap-space-sm">
               <span className="font-label-caps-micro text-label-caps-micro uppercase text-on-surface tracking-wider">Institutional Research</span>
-              <Link to="/about" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">Model Architecture</Link>
-              <a href="#site-footer" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">Capstone Investigators</a>
+              <Link to="/methodology" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">Model Architecture</Link>
+              <Link to="/capstone-showcase" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">Capstone Investigators</Link>
+              <Link to="/about" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">How SafeRoute Works</Link>
               <span className="font-body-sm text-body-sm text-outline-variant">AICW Cohort 2024</span>
+            </div>
+            <div className="flex flex-col gap-space-sm">
+              <span className="font-label-caps-micro text-label-caps-micro uppercase text-on-surface tracking-wider">Contact &amp; team</span>
+              <a
+  href="https://github.com/Zunairah-k"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="font-body-sm text-body-sm hover:text-on-surface transition-colors"
+>
+  Zunairah
+</a>
+
+<a
+  href="https://github.com/umaima06"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="font-body-sm text-body-sm hover:text-on-surface transition-colors"
+>
+  Umaima
+</a>
+
+<a
+  href="https://github.com/alizahh-7"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="font-body-sm text-body-sm hover:text-on-surface transition-colors"
+>
+  Alizah
+</a>
+
+<a
+  href="https://github.com/shaziaiqbal9667"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="font-body-sm text-body-sm hover:text-on-surface transition-colors"
+>
+  Shazia
+</a>
             </div>
           </div>
         </div>
@@ -37,7 +77,7 @@ const Footer = () => {
             <span className="font-label-caps-micro text-label-caps-micro uppercase text-on-surface">Data Attributions:</span>
             <span>OpenRouteService</span><span>•</span><span>IIT Delhi Crash Dataset (Telangana 114 Corridors)</span><span>•</span><span>YOLOv8 on RDD2022 India (5,368 training images)</span><span>•</span><span>Mapillary Street Imagery API</span><span>•</span><span>Google News Real-time Alert Feeds</span>
           </div>
-          <div className="font-body-sm text-body-sm text-outline shrink-0">© 2025 SafeRoute Telangana. All rights reserved.</div>
+          <div className="font-body-sm text-body-sm text-outline shrink-0">Built by Zunairah, Umaima, Alizah &amp; Shazia · © 2025 SafeRoute Telangana.</div>
         </div>
       </div>
     </footer>

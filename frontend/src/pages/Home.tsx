@@ -43,10 +43,10 @@ const Home = () => {
                     <span className="material-symbols-outlined text-[20px]">explore</span>
                     <span>Launch Safe Route Finder</span>
                   </Link>
-                  <a href="#" className="inline-flex items-center gap-space-xs px-space-lg py-space-md rounded-full bg-surface-container-lowest text-on-surface hover:bg-surface-container transition-all duration-200 font-body-lg text-body-lg shadow-sm">
+                  <Link to="/analytics" className="inline-flex items-center gap-space-xs px-space-lg py-space-md rounded-full bg-surface-container-lowest text-on-surface hover:bg-surface-container transition-all duration-200 font-body-lg text-body-lg shadow-sm">
                     <span className="material-symbols-outlined text-[20px] text-secondary">heat_pump</span>
                     <span>Live Telangana Risk Heatmap</span>
-                  </a>
+                  </Link>
                 </div>
 
                 {/* Micro Quick Metric Strip */}
@@ -407,9 +407,9 @@ const Home = () => {
               <Link to="/route-planner" className="w-full sm:w-auto text-center px-space-xl py-space-md rounded-full bg-secondary-container text-on-secondary-container hover:bg-tertiary-fixed-dim transition-all duration-300 font-headline-sm text-headline-sm shadow-md hover:shadow-lg">
                 Test Safe Route Finder Now
               </Link>
-              <a href="#" className="w-full sm:w-auto text-center px-space-xl py-space-md rounded-full bg-surface-container-lowest text-on-surface hover:bg-surface-variant transition-colors font-body-md text-body-md shadow-sm">
+              <Link to="/methodology" className="w-full sm:w-auto text-center px-space-xl py-space-md rounded-full bg-surface-container-lowest text-on-surface hover:bg-surface-variant transition-colors font-body-md text-body-md shadow-sm">
                 Inspect Model Architecture
-              </a>
+              </Link>
               <span className="font-label-caps-micro text-label-caps-micro uppercase text-on-surface-variant text-center">
                 Open Telemetry & Code Available to Evaluation Panel
               </span>

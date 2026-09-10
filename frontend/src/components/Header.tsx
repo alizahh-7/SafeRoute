@@ -1,52 +1,9 @@
-import { Link, NavLink } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { Menu, X } from "lucide-react";
 
-const Header = () => {
-  return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
-      <div className="h-20 w-full max-w-[1800px] mx-auto px-layout-margin-mobile md:px-layout-margin-tablet lg:px-layout-margin-desktop flex items-center justify-between gap-space-md">
-        
-        {/* Brand */}
-        <div className="flex items-center gap-space-md shrink-0">
-          <img alt="SafeRoute Telangana Brand Logo" className="h-8 w-auto object-contain" src="/logo.png" />
-          <div className="flex flex-col">
-            <div className="flex items-center gap-space-xs">
-              <span className="font-headline-sm text-headline-sm text-on-surface">SafeRoute Telangana</span>
-              <span className="bg-surface-container-high text-on-surface-variant font-label-caps-micro text-label-caps-micro uppercase px-space-xs py-space-2xs rounded-full">AICW • Microsoft Capstone</span>
-            </div>
-            <div className="hidden xl:flex items-center gap-space-xs mt-space-2xs">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-secondary"></span>
-              <span className="font-label-caps-micro text-label-caps-micro uppercase text-secondary">Live Feeds Active • Hyderabad Metros • IIT-Delhi Crash DB Synced</span>
-            </div>
-          </div>
-        </div>
+const primary = [["Overview", "/"], ["Safe Route Finder", "/route-planner"], ["Route Results", "/route"], ["Analytics Heatmap", "/analytics"]] as const;
+const more = [["Segment Diagnostics", "/segment/7e60db33"], ["Risk Analysis", "/segment/9a82fd55"], ["Hazard & Reroute", "/hazard-advisory"], ["Saved Corridors", "/saved-corridors"], ["How SafeRoute Works", "/about"], ["Methodology", "/methodology"], ["Capstone Showcase", "/capstone-showcase"]] as const;
+const isActive=(path:string,current:string)=>path==="/"?current==="/":current.startsWith(path.startsWith("/segment")?"/segment":path);
 
-        {/* Navigation */}
-        <nav className="hidden lg:flex items-center gap-space-xs bg-surface-container-low p-space-2xs rounded-full shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-          <NavLink to="/" className={({ isActive }) => `whitespace-nowrap px-space-md py-space-xs font-body-sm transition-colors rounded-full ${isActive ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}>Overview</NavLink>
-          <NavLink to="/route-planner" className={({ isActive }) => `whitespace-nowrap px-space-md py-space-xs font-body-sm transition-colors rounded-full ${isActive ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}>Safe Route Finder</NavLink>
-          <NavLink to="/route" className={({ isActive }) => `whitespace-nowrap px-space-md py-space-xs font-body-sm transition-colors rounded-full ${isActive ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}>Live Safety Map &amp; Results</NavLink>
-          <Link to="/analytics" className="whitespace-nowrap px-space-md py-space-xs rounded-full font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors">Analytics Heatmap</Link>
-          <Link to="/about" className="whitespace-nowrap px-space-md py-space-xs rounded-full font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors">System Methodology</Link>
-          <a href="#site-footer" className="whitespace-nowrap px-space-md py-space-xs rounded-full font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors">Team</a>
-        </nav>
-
-        {/* Actions & Profile */}
-        <div className="flex items-center gap-space-sm shrink-0">
-          <NavLink to="/route-planner" className="hidden sm:inline-flex items-center gap-space-xs px-space-lg py-space-xs rounded-full bg-secondary-container text-on-secondary-container hover:bg-tertiary-fixed-dim transition-colors font-body-md text-body-md font-semibold shadow-[0_2px_8px_rgba(253,199,86,0.25)]">
-            <span className="material-symbols-outlined text-[18px]">navigation</span>Launch Safe Route
-          </NavLink>
-          <div className="flex items-center gap-space-xs pl-space-xs">
-            <div className="w-8 h-8 rounded-full bg-surface-variant ring-1 ring-surface-variant flex items-center justify-center text-xs font-bold text-on-surface-variant">PR</div>
-            <div className="hidden 2xl:flex flex-col text-left">
-              <span className="font-body-sm text-body-sm font-semibold text-on-surface">Dr. Priya Rao</span>
-              <span className="font-label-caps-micro text-label-caps-micro uppercase text-on-surface-variant">Lead AI Engineer</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </header>
-  );
-};
-
-export default Header;
+export default function Header(){const {pathname}=useLocation();const[open,setOpen]=useState(false);const[moreOpen,setMoreOpen]=useState(false);const menu=useRef<HTMLDivElement>(null);useEffect(()=>{setOpen(false);setMoreOpen(false)},[pathname]);useEffect(()=>{const close=(event:MouseEvent)=>{if(menu.current&&!menu.current.contains(event.target as Node)){setOpen(false);setMoreOpen(false)}};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close)},[]);const linkClass=(path:string)=>`whitespace-nowrap px-3 py-2 rounded-full font-body-sm transition-colors ${isActive(path,pathname)?"bg-primary text-on-primary":"text-on-surface-variant hover:text-on-surface hover:bg-surface-container"}`;return <header ref={menu} className="fixed top-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,.04)]"><div className="h-20 w-full max-w-[1800px] mx-auto px-layout-margin-mobile md:px-layout-margin-tablet lg:px-layout-margin-desktop flex items-center justify-between gap-space-md"><Link to="/" aria-label="SafeRoute Telangana home" className="flex items-center gap-space-sm shrink-0"><img alt="SafeRoute Telangana Brand Logo" className="h-8 w-auto object-contain" src="/logo.png"/><span className="hidden sm:flex flex-col"><span className="font-headline-sm text-on-surface">SafeRoute Telangana</span><span className="hidden 2xl:block font-label-caps-micro uppercase text-secondary">AICW · Microsoft Capstone</span></span></Link><nav className="hidden xl:flex items-center gap-1 bg-surface-container-low p-1 rounded-full" aria-label="Primary navigation">{primary.map(([label,path])=><NavLink key={path} to={path} className={linkClass(path)}>{label}</NavLink>)}<div className="relative"><button onClick={()=>setMoreOpen(!moreOpen)} aria-expanded={moreOpen} className={linkClass("/more")}>More</button>{moreOpen&&<div className="absolute right-0 top-11 w-56 rounded-xl bg-surface-container-lowest border border-surface-variant shadow-lg p-2">{more.map(([label,path])=><NavLink key={label} to={path} className={`block px-3 py-2 rounded-lg font-body-sm ${isActive(path,pathname)?"bg-secondary-container/30 text-on-surface":"hover:bg-surface-container-low text-on-surface-variant"}`}>{label}</NavLink>)}</div>}</div></nav><div className="flex items-center gap-space-sm shrink-0"><Link to="/route-planner" className="hidden sm:inline-flex items-center px-space-lg py-space-xs rounded-full bg-secondary-container text-on-secondary-container font-body-md font-semibold">Launch Safe Route</Link><button onClick={()=>setOpen(!open)} aria-label="Open navigation menu" aria-expanded={open} className="xl:hidden w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center">{open?<X size={20}/>:<Menu size={20}/>}</button></div></div>{open&&<><button aria-label="Close navigation" onClick={()=>setOpen(false)} className="fixed inset-0 top-20 bg-on-surface/20 xl:hidden"/><nav className="absolute top-20 inset-x-0 xl:hidden bg-surface-container-lowest border-t border-surface-variant p-space-md shadow-lg" aria-label="Mobile navigation"><div className="grid grid-cols-1 sm:grid-cols-2 gap-1">{[...primary,...more].map(([label,path])=><NavLink key={label} to={path} className={`px-4 py-3 rounded-xl font-body-md ${isActive(path,pathname)?"bg-primary text-on-primary":"bg-surface-container-low text-on-surface hover:bg-secondary-container/30"}`}>{label}</NavLink>)}</div></nav></>}</header>}
