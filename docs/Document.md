@@ -137,3 +137,35 @@ attempt to address a known limitation, and as a direction for future work —
 e.g. sourcing additional real transverse crack images, or using more diverse 
 augmentation (rotation, synthetic crack generation) rather than brightness 
 variation alone on a small base set.
+
+---
+
+## Vision Pipeline — Bug Fix & Testing (verified working)
+
+**Video-stream misdetection bug (found and fixed):** Ultralytics' predict()
+auto-detects input type by URL pattern, and misread Mapillary's photo URLs
+(which have long query strings, not a clean .jpg ending) as a live video
+stream rather than a single image — causing an infinite "video stream
+unresponsive" loop instead of running detection. Fixed by explicitly
+downloading the image via requests + PIL before passing it to the model,
+rather than passing the raw URL string.
+
+**Live testing results (Mapillary + fallback):**
+- Tested against 4 real Hyderabad locations (Khairatabad, Gachibowli,
+  Charminar, Punjagutta) at the API's 50m search radius. Charminar returned
+  real street coverage; the other three did not — confirming that Mapillary
+  coverage in Hyderabad is sparse at tight radius, and the RDD2022 fallback
+  path is the common case in practice, not a rare edge case. This is
+  documented honestly rather than assumed away.
+- Confirmed both pipeline paths work correctly end-to-end: a no-coverage
+  segment correctly falls back to an RDD2022 sample image and returns a
+  valid severity; a covered segment correctly fetches and processes a real
+  Mapillary photo.
+- Added get_street_image_for_segment(), which tries multiple points along
+  a segment's coordinate list (start/middle/end) rather than a single point,
+  to improve real-coverage odds given the fixed 50m radius. Use this once
+  wired to Umaima's real segment data.
+
+**Note on Mapillary API:** the current API (as of testing) requires
+separate lat/lng parameters (not a combined closeto string) and caps
+radius at 50m — the vision_pipeline.py implementation reflects this.

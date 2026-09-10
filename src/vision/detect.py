@@ -5,6 +5,10 @@ Severity scoring weights detection confidence, bounding box size
 (bigger = closer/more severe), and class-specific risk weighting.
 """
 
+from io import BytesIO
+
+import requests
+from PIL import Image
 from ultralytics import YOLO
 
 
@@ -29,9 +33,23 @@ def load_model(weights_path="best.pt"):
     return YOLO(weights_path)
 
 
-def detect_damage(model, image_path, conf=0.25):
+def download_image(url):
     """
-    Runs detection on a single image (local path or URL).
+    Downloads an image from a URL and returns a PIL Image.
+
+    Needed because Ultralytics can misread complex query-string URLs
+    (e.g. Mapillary photo URLs) as a video stream instead of a still
+    image, causing it to hang.
+    """
+    response = requests.get(url, timeout=10)
+    return Image.open(BytesIO(response.content))
+
+
+def detect_damage(model, image_path_or_url, conf=0.25):
+    """
+    Runs detection on a single image — accepts a local path, a PIL
+    Image, or an image URL. URLs are downloaded first to avoid YOLO's
+    video-stream auto-detection misfiring on non-.jpg-ending URLs.
 
     Returns:
         list: [
@@ -43,7 +61,12 @@ def detect_damage(model, image_path, conf=0.25):
             ...
         ]
     """
-    results = model.predict(image_path, conf=conf, verbose=False)
+    if isinstance(image_path_or_url, str) and image_path_or_url.startswith("http"):
+        image = download_image(image_path_or_url)
+    else:
+        image = image_path_or_url
+
+    results = model.predict(image, conf=conf, verbose=False)
 
     detections = []
 
