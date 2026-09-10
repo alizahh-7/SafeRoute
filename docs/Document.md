@@ -109,3 +109,31 @@ frozen news_flags contract.
 - src/vision/augment_data.py — targeted transverse-crack data augmentation
 - src/news/news_check.py — schema-facing news_flags function + urgency/recency bonus layer
 
+---
+
+## v3 Experiment: Targeted Data Augmentation
+
+Attempted to address the transverse crack class's low performance by 
+oversampling its ~44 training images with brightness-variation augmentation 
+(132 additional images), then retraining for 50 epochs.
+
+**Result (v2 vs v3):**
+
+| Class | v2 mAP50 | v3 mAP50 | Change |
+|---|---|---|---|
+| Transverse crack | 0.187 | 0.227 | +0.040 |
+| Overall | 0.404 | 0.391 | -0.013 |
+| Longitudinal crack | 0.284 | 0.253 | -0.031 |
+| Pothole | 0.437 | 0.396 | -0.041 |
+| Alligator crack | 0.646 | 0.614 | -0.032 |
+| Other corruption | 0.468 | 0.464 | -0.004 |
+
+**Conclusion:** the targeted augmentation modestly improved transverse crack 
+detection but caused a slight regression across other classes, likely due to 
+overfitting on near-duplicate augmented images from a very small base set (44 
+originals). v2 was kept as the final production model given its stronger 
+overall balance. This experiment is documented as evidence of a deliberate 
+attempt to address a known limitation, and as a direction for future work — 
+e.g. sourcing additional real transverse crack images, or using more diverse 
+augmentation (rotation, synthetic crack generation) rather than brightness 
+variation alone on a small base set.
