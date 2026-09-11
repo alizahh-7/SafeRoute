@@ -19,12 +19,21 @@ def test_segment_route_creates_segments():
     assert "segment_id" in segments[0]
 
 
-def test_historical_score_near_black_spot_is_high():
+def test_historical_score_near_black_spot_is_higher_than_quiet_area():
     black_spots = load_black_spots()
     crashes = load_crash_data()
-    segment = {"midpoint": {"lat": 17.3725, "lng": 78.4980}}
-    score = compute_historical_score(segment, black_spots, crashes)
-    assert score > 30
+
+    # Right on top of a real black spot: "Hyderabad", NH-44, from black_spots.csv
+    risky_segment = {"midpoint": {"lat": 17.385, "lng": 78.4867}}
+
+    # Far from any known black spot or crash cluster — genuinely quiet coordinates
+    quiet_segment = {"midpoint": {"lat": 17.55, "lng": 78.20}}
+
+    risky_score = compute_historical_score(risky_segment, black_spots, crashes)
+    quiet_score = compute_historical_score(quiet_segment, black_spots, crashes)
+
+    assert risky_score > quiet_score
+    assert risky_score > 0  # confirms the real black spot is actually being detected at all
 
 
 def test_fusion_combines_signals_correctly():

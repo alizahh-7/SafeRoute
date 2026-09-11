@@ -7,3 +7,4 @@ venv/
 data/raw/*.csv
 !data/raw/.gitkeep
 .venv/
+.pytest_cache/

@@ -1,4 +1,39 @@
-location_name,latitude,longitude,yearly_accident_count
-SAMPLE_Malakpet_Junction,17.3725,78.4980,18
-SAMPLE_Chaderghat_Bridge,17.3760,78.4890,25
-SAMPLE_Khairatabad_Circle,17.4050,78.4640,12
+﻿location_name,highway,latitude,longitude,yearly_accident_count
+"Thondupally Village, Shamshabad",NH-44,17.24,78.39,15
+Ghansimiyaguda T Junction,NH-44,17.22,78.4,12
+Madanapalli Thanda Y Junction,NH-44,17.21,78.41,11
+Palmakula Village,NH-44,17.27,78.35,14
+Sarapaka Burgampadu,NH-30,17.67,80.89,11
+Adilabad,NH-7,19.6748,78.5274,450
+Hyderabad,NH-44,17.385,78.4867,228
+Bhadradri kothaguda,NH-30,17.73,80.72,8
+Hanumakonda,NH-163,18.0072,79.5583,8
+Jagtial,NH-563,18.785,78.912,8
+Jangoan,NH-163,17.7227,79.1518,8
+Jayashankar Bhupalpally,NH-163,18.4314,79.8605,8
+Jogulamba Gadwal,NH-44,16.0908,77.8367,8
+Kamareddy,NH-44,18.3167,78.35,8
+Karimnagar,NH-563,18.4386,79.1288,8
+Khammam,NH-365B,17.247253,80.151443,8
+Kumuram Bheem Asifabad,NH-363,19.3576,79.4704,8
+Mahabubabad,NH-930P,17.5975,80.0015,8
+Mahabubnagar,NH-167,16.7375,78.0081,8
+Mancherial,NH-63,18.8715,79.4444,8
+Medak,NH-765D,18.045,78.2633,8
+Medak-Malkajgiri,NH-765D,18.045992,78.263359,8
+Mulugu,NH-163,18.1916,79.9441,8
+Nagarkurnool,NH-167K,16.4855,78.3173,8
+Nalgonda,NH-565,17.0566,79.2683,8
+Narayanpet,NH-167,16.7445,77.496,8
+Nirmal,NH-44,19.0964,78.343,8
+Nizamabad,NH-63,18.6742,78.1016,8
+Peddapalli,NH-163,18.6162,79.3832,8
+Rajanna Sircilla,NH-365B,18.3866,78.8022,8
+Rangareddy,NH-65,16.5,77.5-79.5,8
+Sangareddy,NH-161,17.6116,78.0818,8
+Siddipet,NH-365B,18.101904,78.852074,8
+Suryapet,NH-365B,17.1439,79.6239,8
+Vikarabad,NH-163,17.3364,77.9048,8
+Wanaparthy,NH-167,16.3623,78.0344,8
+Warangal,NH-163,18,79.58,8
+Yadadri Bhuvanagiri,NH-163,17.4533,78.9288,8

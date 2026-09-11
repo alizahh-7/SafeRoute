@@ -6,12 +6,17 @@ logic as the root main.py — no duplicated code.
 
 from fastapi import FastAPI
 from pydantic import BaseModel
-
+from fastapi.middleware.cors import CORSMiddleware
 from main import run_pipeline
 from src.risk_engine.fusion import route_total_risk
 
 app = FastAPI()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Vite's default dev port
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class RouteRequest(BaseModel):
     origin: str

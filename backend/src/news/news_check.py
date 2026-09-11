@@ -71,14 +71,15 @@ def get_news_flags(road_name):
         None or a list of relevant headline strings.
     """
     results = check_news(road_name)
+    # Use the first meaningful word of the road name to confirm relevance
+    # (e.g. "Khairatabad" from "Khairatabad Flyover")
+    road_keyword = road_name.split()[0].lower()
 
     relevant = [
         result["title"]
         for result in results
-        if any(
-            keyword in result["title"].lower()
-            for keyword in RISK_KEYWORDS
-        )
+        if road_keyword in result["title"].lower()
+        and any(keyword in result["title"].lower() for keyword in RISK_KEYWORDS)
     ]
 
     return relevant if relevant else None

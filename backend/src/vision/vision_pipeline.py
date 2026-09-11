@@ -14,7 +14,9 @@ import random
 import requests
 
 from src.vision.detect import load_model, detect_damage, severity_from_detections
+from dotenv import load_dotenv
 
+load_dotenv()
 
 MAPILLARY_TOKEN = os.getenv("MAPILLARY_TOKEN")
 FALLBACK_IMAGES = glob.glob("data/india_subset/test/images/*.jpg")
@@ -87,10 +89,12 @@ def get_segment_vision_severity(model, lat: float, lon: float):
     if image_url:
         detections = detect_damage(model, image_url)
         source = "mapillary"
-    else:
+    elif FALLBACK_IMAGES:
         fallback_img = random.choice(FALLBACK_IMAGES)
         detections = detect_damage(model, fallback_img)
         source = "rdd2022_sample"
+    else:
+        return "none", "no_image_available"
 
     severity = severity_from_detections(detections)
 
@@ -110,10 +114,12 @@ def get_segment_vision_severity_multi(model, coordinates):
     if image_url:
         detections = detect_damage(model, image_url)
         source = "mapillary"
-    else:
+    elif FALLBACK_IMAGES:
         fallback_img = random.choice(FALLBACK_IMAGES)
         detections = detect_damage(model, fallback_img)
         source = "rdd2022_sample"
+    else:
+        return "none", "no_image_available"
 
     severity = severity_from_detections(detections)
 

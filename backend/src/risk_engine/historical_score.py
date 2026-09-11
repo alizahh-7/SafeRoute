@@ -21,7 +21,20 @@ CRASH_RADIUS_M = 300
 
 
 def load_black_spots(path: str = "data/external/black_spots.csv") -> pd.DataFrame:
-    return pd.read_csv(path)
+    df = pd.read_csv(path, encoding="utf-8-sig")
+    df["yearly_accident_count"] = (
+        df["yearly_accident_count"].astype(str).str.replace(",", "").astype(float)
+    )
+
+    df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
+    df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
+
+    bad_rows = df[df["latitude"].isna() | df["longitude"].isna()]
+    if not bad_rows.empty:
+        print(f"WARNING: dropping {len(bad_rows)} black spot row(s) with invalid coordinates:")
+        print(bad_rows[["location_name"]].to_string(index=False))
+
+    return df.dropna(subset=["latitude", "longitude"])
 
 
 def load_crash_data(path: str = "data/processed/telangana_crashes.csv") -> pd.DataFrame:
