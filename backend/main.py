@@ -4,8 +4,6 @@ Owner: Umaima (integration owner)
 """
 
 from datetime import datetime
-import random
-import pandas as pd
 
 from src.api_clients.geocode import geocode, reverse_geocode
 from src.api_clients.maps_routing import get_route
@@ -32,32 +30,17 @@ def apply_real_weather_and_traffic(segment: dict, waterlogging_points) -> dict:
 
 
 def apply_real_vision_and_news(segment: dict, vision_model) -> dict:
-    severity, source = get_segment_vision_severity_multi(vision_model, segment["coordinates"])
+    severity, source, image_url = get_segment_vision_severity_multi(vision_model, segment["coordinates"])
     segment["vision_severity"] = severity
-    segment["vision_source"] = source  # not in frozen schema, but useful to log for the report
+    segment["vision_source"] = source
+    segment["image_url"] = image_url
     segment["news_flags"] = get_news_flags(segment["road_name"])
     return segment
 
-def load_waterlogging_points(path: str = "data/external/waterlogging_points.csv") -> pd.DataFrame:
-    for encoding in ["utf-8-sig", "cp1252", "latin-1"]:
-        try:
-            return pd.read_csv(path, encoding=encoding)
-        except UnicodeDecodeError:
-            continue
-    raise ValueError(f"Could not read {path} with any known encoding")
 
-
-def run_pipeline(origin_name: str, destination_name: str):
-    print(f"\nGeocoding: {origin_name} -> {destination_name}")
-    origin = geocode(origin_name)
-    destination = geocode(destination_name)
-
-    print("Fetching route...")
-    route = get_route(origin, destination)
-
-    segments = segment_route(route["coordinates"], segment_length_m=500)
-    print(f"Route split into {len(segments)} segments")
-    print("Reverse-geocoding segment names...")
+def score_route(route_coordinates, waterlogging_points, vision_model):
+    """Takes raw route coordinates, returns fully scored segments. Reusable for any route."""
+    segments = segment_route(route_coordinates, segment_length_m=500)
     for seg in segments:
         seg["road_name"] = reverse_geocode(seg["midpoint"]["lat"], seg["midpoint"]["lng"])
 
@@ -69,16 +52,27 @@ def run_pipeline(origin_name: str, destination_name: str):
     current_day = datetime.now().strftime("%A")
     segments = [apply_time_modifier(s, current_day, daily_profile) for s in segments]
 
-    waterlogging_points = load_waterlogging_points()
     segments = [apply_real_weather_and_traffic(s, waterlogging_points) for s in segments]
+    segments = [apply_real_vision_and_news(s, vision_model) for s in segments]
+
+    return fuse_all_segments(segments)
+
+
+def run_pipeline(origin_name: str, destination_name: str):
+    print(f"\nGeocoding: {origin_name} -> {destination_name}")
+    origin = geocode(origin_name)
+    destination = geocode(destination_name)
+
+    print("Fetching route...")
+    route = get_route(origin, destination)
+
+    waterlogging_points = load_waterlogging_points()
 
     print("Loading vision model (one-time, may take a moment)...")
     vision_model = load_model("src/vision/best.pt")
 
-    print("Running vision + news checks per segment...")
-    segments = [apply_real_vision_and_news(s, vision_model) for s in segments]
-
-    segments = fuse_all_segments(segments)
+    print("Scoring route...")
+    segments = score_route(route["coordinates"], waterlogging_points, vision_model)
 
     print(f"\nRoute total risk score: {route_total_risk(segments)}/100\n")
     for s in segments:
@@ -89,4 +83,5 @@ def run_pipeline(origin_name: str, destination_name: str):
 
 
 if __name__ == "__main__":
-    run_pipeline("Malakpet, Hyderabad", "Khairatabad, Hyderabad")
+    run_pipeline("Ameerpet, Hyderabad", "Secunderabad, Hyderabad")
+    run_pipeline("Gachibowli, Hyderabad", "Kukatpally, Hyderabad")

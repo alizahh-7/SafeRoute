@@ -1,16 +1,17 @@
+//frontend/src/pages/LiveAnalyticsRiskHeatmap.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Activity, AlertTriangle, ChevronRight, Clock3, Eye, MapPin, Radar } from "lucide-react";
-import { fetchRoute } from "../services/api";
-import type { RouteSegment } from "../types/route";
+import { useRouteContext } from "../context/RouteContext";
 
 const shell = "w-full max-w-[1440px] mx-auto px-layout-margin-mobile md:px-layout-margin-tablet lg:px-layout-margin-desktop";
 const color = (score: number) => score >= 75 ? "#B93535" : score >= 50 ? "#D36128" : score >= 30 ? "#D99B26" : "#2E7D5B";
 
 export default function LiveAnalyticsRiskHeatmap() {
-  const [segments, setSegments] = useState<RouteSegment[]>([]);
+  const { routeData } = useRouteContext();
+  const segments = routeData?.segments ?? [];
   const [filter, setFilter] = useState<"all" | "hazards" | "surface">("all");
-  useEffect(() => { document.title = "LIVE ANALYTICS & RISK HEATMAP | SafeRoute Telangana"; fetchRoute().then(setSegments); }, []);
+  useEffect(() => { document.title = "LIVE ANALYTICS & RISK HEATMAP | SafeRoute Telangana"; }, []);
   const filtered = useMemo(() => segments.filter(item => filter === "all" || filter === "hazards" ? filter === "all" || item.waterlogging_flag || item.news_flags?.length : item.vision_severity !== "none"), [segments, filter]);
   const average = segments.length ? Math.round(segments.reduce((sum, item) => sum + item.final_score, 0) / segments.length) : 0;
   const signals = segments.filter(item => item.waterlogging_flag || item.news_flags?.length).length;

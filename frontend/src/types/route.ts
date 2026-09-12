@@ -1,6 +1,7 @@
+//frontend/src/types/route.ts
 export type TrafficLevel = "low" | "medium" | "high" | "severe";
 export type VisionSeverity = "none" | "minor" | "moderate" | "severe";
-export type ImageSource = "site" | "rdd2022_sample" | null;
+export type ImageSource = "mapillary" | "rdd2022_sample" | "no_image_available";
 
 export interface Coordinate {
   lat: number;
@@ -18,9 +19,25 @@ export interface RouteSegment {
   traffic_level: TrafficLevel;
   waterlogging_flag: boolean;
   vision_severity: VisionSeverity;
+  vision_source: ImageSource;
+  image_url: string | null;
   news_flags: string[] | null;
   final_score: number;
   explanation: string;
-  image_url: string | null;
-  image_source: ImageSource;
+}
+
+export interface RouteRiskResponse {
+  route_total_risk: number;
+  segments: RouteSegment[];
+}
+
+export interface AlternateRouteResponse {
+  alternate_available: boolean;
+  reason?: string;
+  should_suggest_alternate?: boolean;
+  primary_risk?: number;
+  alternate_risk?: number;
+  extra_time_minutes?: number;
+  primary_segments?: RouteSegment[];
+  alternate_segments?: RouteSegment[] | null;
 }

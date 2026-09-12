@@ -3,6 +3,7 @@ from src.data_pipeline.segmentation import segment_route, haversine_m
 from src.risk_engine.historical_score import compute_historical_score, load_black_spots, load_crash_data
 from src.risk_engine.fusion import fuse_segment_risk
 from fastapi.testclient import TestClient
+from src.routing.alt_route import suggest_safer_route
 from api.main import app
 
 client = TestClient(app)
@@ -61,3 +62,10 @@ def test_route_risk_endpoint_returns_valid_response():
     assert "route_total_risk" in data
     assert len(data["segments"]) > 0
     assert "final_score" in data["segments"][0]
+    
+def test_alt_route_returns_valid_structure():
+    result = suggest_safer_route("Malakpet, Hyderabad", "Khairatabad, Hyderabad")
+    assert "alternate_available" in result
+    if result["alternate_available"]:
+        assert "primary_risk" in result
+        assert "should_suggest_alternate" in result

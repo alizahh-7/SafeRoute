@@ -3,8 +3,12 @@ import requests
 def get_weather_modifier(lat: float, lon: float) -> int:
     url = "https://api.open-meteo.com/v1/forecast"
     params = {"latitude": lat, "longitude": lon, "current": "precipitation,wind_speed_10m,visibility"}
-    response = requests.get(url, params=params, timeout=5)
-    data = response.json().get("current", {})
+    try:
+        response = requests.get(url, params=params, timeout=8)
+        response.raise_for_status()
+        data = response.json().get("current", {})
+    except requests.exceptions.RequestException:
+        return 0  # fail safe: treat as clear weather rather than crashing the whole pipeline
 
     precipitation = data.get("precipitation", 0)
     wind_speed = data.get("wind_speed_10m", 0)

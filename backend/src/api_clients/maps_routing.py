@@ -62,6 +62,40 @@ def get_route(origin_coords: tuple[float, float], destination_coords: tuple[floa
         "duration_sec": segment_info["duration"],  # NOTE: this is NOT live-traffic-aware —
                                                      # that's what TomTom is for, added separately
     }
+    
+def get_alternative_routes(origin_coords: tuple[float, float], destination_coords: tuple[float, float]) -> list[dict]:
+    """
+    Returns a list of route dicts (primary + alternates), same shape as get_route's
+    single return value. ORS returns alternates directly when requested.
+    """
+    if not ORS_API_KEY:
+        raise EnvironmentError("ORS_API_KEY not found. Check your .env file.")
+
+    headers = {"Authorization": ORS_API_KEY, "Content-Type": "application/json"}
+    body = {
+        "coordinates": [
+            [origin_coords[1], origin_coords[0]],
+            [destination_coords[1], destination_coords[0]],
+        ],
+        "alternative_routes": {"target_count": 2, "share_factor": 0.6, "weight_factor": 1.4},
+    }
+
+    response = requests.post(ORS_URL, json=body, headers=headers)
+    if response.status_code != 200:
+        raise ValueError(f"ORS error {response.status_code}: {response.text}")
+
+    data = response.json()
+    routes = []
+    for feature in data.get("features", []):
+        coords_lonlat = feature["geometry"]["coordinates"]
+        coords_latlon = [(lat, lon) for lon, lat in coords_lonlat]
+        segment_info = feature["properties"]["segments"][0]
+        routes.append({
+            "coordinates": coords_latlon,
+            "distance_m": segment_info["distance"],
+            "duration_sec": segment_info["duration"],
+        })
+    return routes
 
 
 if __name__ == "__main__":

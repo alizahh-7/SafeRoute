@@ -119,11 +119,10 @@ def get_segment_vision_severity_multi(model, coordinates):
         detections = detect_damage(model, fallback_img)
         source = "rdd2022_sample"
     else:
-        return "none", "no_image_available"
+        return "none", "no_image_available", None
 
     severity = severity_from_detections(detections)
-
-    return severity, source
+    return severity, source, image_url
 
 
 if __name__ == "__main__":

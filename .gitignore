@@ -8,3 +8,4 @@ data/raw/*.csv
 !data/raw/.gitkeep
 .venv/
 .pytest_cache/
+alt_route_output.json

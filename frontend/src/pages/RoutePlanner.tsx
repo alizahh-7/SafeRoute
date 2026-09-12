@@ -1,8 +1,21 @@
+//frontend/src/pages/RoutePlanner.tsx
+
 import { MapPin, Navigation, Car, Bike, Ambulance, Search, Clock, CloudRain, Star, ShieldCheck, Zap, Cpu, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useRouteContext } from "../context/RouteContext";
 
 const RoutePlanner = () => {
   const navigate = useNavigate();
+  const { planRoute, loading, error } = useRouteContext();
+  const [origin, setOrigin] = useState("Gachibowli Bio-Diversity Junction, Hyderabad");
+  const [destination, setDestination] = useState("Secunderabad Railway Station, Hyderabad");
+
+  const handleAnalyze = async () => {
+    await planRoute(origin, destination);
+    navigate("/route");
+  };
+
   return (
     <div className="w-full pt-20 bg-background min-h-screen pb-space-3xl">
       <div className="max-w-[1440px] mx-auto px-layout-margin-mobile md:px-layout-margin-tablet lg:px-layout-margin-desktop pt-space-xl">
@@ -51,12 +64,18 @@ const RoutePlanner = () => {
             <div className="bg-surface-container-low border border-surface-variant rounded-xl p-space-md mb-space-lg">
               <div className="flex gap-space-sm items-center mb-space-sm">
                 <div className="w-10 h-10 rounded-full bg-surface-container-lowest border border-surface-variant flex items-center justify-center shrink-0 text-on-surface-variant"><MapPin size={18}/></div>
-                <div className="flex-1 bg-surface-container-lowest border border-surface-variant rounded-full px-space-md py-space-sm font-body-md text-body-md text-on-surface">Gachibowli Bio-Diversity Junction - Hyderabad</div>
+                <input value={origin} onChange={(e) => setOrigin(e.target.value)}
+                className="flex-1 bg-surface-container-lowest border border-surface-variant rounded-full px-space-md py-space-sm font-body-md text-body-md text-on-surface outline-none focus:border-secondary"
+                placeholder="Starting point"
+                />
                 <button className="bg-surface-container text-on-surface px-space-md py-space-sm rounded-full font-label-code-md text-label-code-md flex items-center gap-space-2xs hover:bg-surface-variant transition-colors"><Navigation size={14}/> Current Location</button>
               </div>
               <div className="flex gap-space-sm items-center mb-space-sm">
                 <div className="w-10 h-10 rounded-full bg-surface-container-lowest border border-surface-variant flex items-center justify-center shrink-0 text-error"><MapPin size={18}/></div>
-                <div className="flex-1 bg-surface-container-lowest border border-surface-variant rounded-full px-space-md py-space-sm font-body-md text-body-md text-on-surface">Secunderabad Railway Station - Hyderabad</div>
+                <input value={destination} onChange={(e) => setDestination(e.target.value)}
+                className="flex-1 bg-surface-container-lowest border border-surface-variant rounded-full px-space-md py-space-sm font-body-md text-body-md text-on-surface outline-none focus:border-secondary"
+                placeholder="Destination"
+                />
                 <button className="w-10 h-10 rounded-full bg-secondary text-on-secondary flex items-center justify-center hover:bg-secondary-fixed transition-colors"><Search size={18}/></button>
               </div>
               <div className="flex flex-wrap items-center gap-space-sm pt-space-xs pl-13">
@@ -117,9 +136,10 @@ const RoutePlanner = () => {
               </div>
             </div>
 
-            <button onClick={() => navigate('/route')} className="w-full bg-on-surface text-surface py-space-md rounded-full font-headline-sm text-headline-sm flex items-center justify-center gap-space-sm hover:bg-on-surface-variant transition-colors shadow-md hover:shadow-lg hover:-translate-y-0.5">
-              <Navigation size={20} /> Analyze Corridor Safety & Fetch Routes
+            <button onClick={handleAnalyze} disabled={loading} className="w-full bg-on-surface text-surface py-space-md rounded-full font-headline-sm text-headline-sm flex items-center justify-center gap-space-sm hover:bg-on-surface-variant transition-colors shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-50">
+              <Navigation size={20} /> {loading ? "Analyzing real route data..." : "Analyze Corridor Safety & Fetch Routes"}
             </button>
+            {error && <p className="text-error font-body-sm mt-space-sm">{error}</p>}
           </div>
 
           {/* Sidebar Area */}

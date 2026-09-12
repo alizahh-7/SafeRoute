@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from main import run_pipeline
 from src.risk_engine.fusion import route_total_risk
+from src.routing.alt_route import suggest_safer_route
 
 app = FastAPI()
 app.add_middleware(
@@ -30,3 +31,7 @@ def get_route_risk(req: RouteRequest):
         "route_total_risk": route_total_risk(segments),
         "segments": segments,
     }
+    
+@app.post("/alternate-route")
+def get_alternate_route(req: RouteRequest):
+    return suggest_safer_route(req.origin, req.destination)

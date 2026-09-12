@@ -1,18 +1,20 @@
+//frontend/src/pages/RealTimeHazardRerouteAdvisory.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AlertTriangle, ArrowRight, Check, ChevronLeft, CloudRain, MapPin, Navigation, Radio, ShieldCheck, Volume2 } from "lucide-react";
-import { fetchRoute } from "../services/api";
 import type { RouteSegment } from "../types/route";
+import { useRouteContext } from "../context/RouteContext";
 
 const shell = "w-full max-w-[1440px] mx-auto px-layout-margin-mobile md:px-layout-margin-tablet lg:px-layout-margin-desktop";
 const risk = (score: number) => score >= 75 ? "text-[#B93535] bg-[#F9EAEA] border-[#B93535]/20" : score >= 50 ? "text-[#D36128] bg-[#FAEEE8] border-[#D36128]/20" : "text-[#2E7D5B] bg-[#EBF4EF] border-[#2E7D5B]/20";
 
 export default function RealTimeHazardRerouteAdvisory() {
-  const [segments, setSegments] = useState<RouteSegment[]>([]);
+  const { routeData } = useRouteContext();
+  const segments = routeData?.segments ?? [];
   const [accepted, setAccepted] = useState(false);
   const [voiceOn, setVoiceOn] = useState(false);
   const navigate = useNavigate();
-  useEffect(() => { document.title = "REAL-TIME HAZARD & REROUTE ADVISORY | SafeRoute Telangana"; fetchRoute().then(setSegments); }, []);
+  useEffect(() => { document.title = "REAL-TIME HAZARD & REROUTE ADVISORY | SafeRoute Telangana"; }, []);
   const direct = useMemo(() => segments.reduce<RouteSegment | null>((worst, item) => !worst || item.final_score > worst.final_score ? item : worst, null), [segments]);
   const safer = useMemo(() => segments.reduce<RouteSegment | null>((best, item) => !best || item.final_score < best.final_score ? item : best, null), [segments]);
   const delay = direct ? Math.max(4, Math.round(direct.final_score / 3)) : 0;

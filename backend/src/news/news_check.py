@@ -41,6 +41,7 @@ LOW_URGENCY_KEYWORDS = [
     "maintenance",
     "review",
 ]
+_news_cache = {}
 
 
 def check_news(road_name, max_results=5):
@@ -70,6 +71,8 @@ def get_news_flags(road_name):
     Returns:
         None or a list of relevant headline strings.
     """
+    if road_name in _news_cache:
+        return _news_cache[road_name]
     results = check_news(road_name)
     # Use the first meaningful word of the road name to confirm relevance
     # (e.g. "Khairatabad" from "Khairatabad Flyover")
@@ -81,8 +84,9 @@ def get_news_flags(road_name):
         if road_keyword in result["title"].lower()
         and any(keyword in result["title"].lower() for keyword in RISK_KEYWORDS)
     ]
-
-    return relevant if relevant else None
+    flags = relevant if relevant else None
+    _news_cache[road_name] = flags
+    return flags
 
 
 def get_route_news_advisory(segment_road_names):
