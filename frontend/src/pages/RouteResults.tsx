@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Navigation, ShieldCheck, AlertTriangle, Zap, Eye, CheckCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useRouteContext } from "../context/RouteContext";
-import MapPlaceholder from "../components/MapPlaceholder";
+import RouteMap from "../components/RouteMap";
 import SegmentDetailDrawer from "../components/SegmentDetailDrawer";
 import SegmentRiskBadge from "../components/SegmentRiskBadge";
 import type { RouteSegment } from "../types/route";
@@ -78,7 +78,7 @@ const RouteResults = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
           <div className="lg:col-span-7 flex flex-col gap-space-md">
             <div className="rounded-xl overflow-hidden border border-surface-variant shadow-sm h-[420px]">
-              <MapPlaceholder segments={segments} />
+              <RouteMap segments={segments} />
             </div>
             <p className="font-body-sm text-on-surface-variant text-center">Route line is illustrative — segment scores and coordinates below are real.</p>
 
