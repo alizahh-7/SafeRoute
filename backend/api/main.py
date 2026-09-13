@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from main import run_pipeline
 from src.risk_engine.fusion import route_total_risk
 from src.routing.alt_route import suggest_safer_route
+from src.api_clients.geocode import geocode, get_location_suggestions, reverse_geocode
+from src.news.news_check import get_news_flags
 
 app = FastAPI()
 app.add_middleware(
@@ -35,3 +37,16 @@ def get_route_risk(req: RouteRequest):
 @app.post("/alternate-route")
 def get_alternate_route(req: RouteRequest):
     return suggest_safer_route(req.origin, req.destination)
+
+@app.get("/location-suggestions")
+def location_suggestions(q: str):
+    return {"suggestions": get_location_suggestions(q)}
+
+@app.get("/reverse-geocode")
+def reverse_geocode_endpoint(lat: float, lon: float):
+    return {"label": reverse_geocode(lat, lon)}
+
+@app.get("/city-news")
+def city_news():
+    flags = get_news_flags("Hyderabad")
+    return {"headlines": flags or []}

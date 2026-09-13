@@ -52,3 +52,27 @@ export const fetchAlternateRoute = async (
 
   return response.json();
 };
+
+export interface LocationSuggestion { label: string; lat: number; lon: number; }
+
+export const fetchLocationSuggestions = async (query: string): Promise<LocationSuggestion[]> => {
+  if (query.trim().length < 3) return [];
+  const response = await fetch(`${API_BASE_URL}/location-suggestions?q=${encodeURIComponent(query)}`);
+  if (!response.ok) return [];
+  const data = await response.json();
+  return data.suggestions ?? [];
+};
+
+export const reverseGeocodeLocation = async (lat: number, lon: number): Promise<string> => {
+  const response = await fetch(`${API_BASE_URL}/reverse-geocode?lat=${lat}&lon=${lon}`);
+  if (!response.ok) throw new ApiError("Could not determine your location name.");
+  const data = await response.json();
+  return data.label;
+};
+
+export const fetchCityNews = async (): Promise<string[]> => {
+  const response = await fetch(`${API_BASE_URL}/city-news`);
+  if (!response.ok) return [];
+  const data = await response.json();
+  return data.headlines ?? [];
+};
