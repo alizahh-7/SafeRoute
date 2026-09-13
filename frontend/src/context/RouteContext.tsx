@@ -12,6 +12,7 @@ interface RouteContextValue {
   loading: boolean;
   error: string | null;
   planRoute: (origin: string, destination: string) => Promise<void>;
+  acceptAlternateRoute: () => boolean;
 }
 
 const RouteContext = createContext<RouteContextValue | undefined>(undefined);
@@ -49,8 +50,19 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       .catch(() => setAlternateData(null));
   }, []);
 
+  const acceptAlternateRoute = useCallback(() => {
+    if (!alternateData?.alternate_segments?.length) return false;
+    const total = alternateData.alternate_risk ?? Math.round(
+      alternateData.alternate_segments.reduce((sum, segment) => sum + segment.final_score, 0)
+      / alternateData.alternate_segments.length * 10,
+    ) / 10;
+    setRouteData({ route_total_risk: total, segments: alternateData.alternate_segments });
+    setAlternateData(null);
+    return true;
+  }, [alternateData]);
+
   return (
-    <RouteContext.Provider value={{ origin, destination, routeData, alternateData, loading, error, planRoute }}>
+    <RouteContext.Provider value={{ origin, destination, routeData, alternateData, loading, error, planRoute, acceptAlternateRoute }}>
       {children}
     </RouteContext.Provider>
   );

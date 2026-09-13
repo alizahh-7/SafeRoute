@@ -1,4 +1,4 @@
-import { MapPin, Navigation, Car, Bike, Bus, Ambulance, Clock, CloudRain, Star, ShieldCheck, Cpu, AlertTriangle, Zap } from "lucide-react";
+import { MapPin, Navigation, Car, Bike, Bus, Ambulance, Star, ShieldCheck, Cpu, AlertTriangle, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useRouteContext } from "../context/RouteContext";
@@ -19,6 +19,8 @@ const quickPicks = [
   ["Kukatpally, Hyderabad", "Ameerpet, Hyderabad"],
 ];
 
+const cleanLocation = (value: string) => value.replace(/\s+/g, " ").trim();
+
 const RoutePlanner = () => {
   const navigate = useNavigate();
   const { planRoute, loading, error } = useRouteContext();
@@ -35,15 +37,21 @@ const RoutePlanner = () => {
   }, []);
 
   const handleAnalyze = async () => {
-    if (!origin.trim() || !destination.trim()) return;
-    await planRoute(origin, destination);
+    const cleanOrigin = cleanLocation(origin);
+    const cleanDestination = cleanLocation(destination);
+    if (!cleanOrigin || !cleanDestination) return;
+    setOrigin(cleanOrigin);
+    setDestination(cleanDestination);
+    await planRoute(cleanOrigin, cleanDestination);
     navigate("/route");
   };
 
   const handleQuickPick = async (o: string, d: string) => {
-    setOrigin(o);
-    setDestination(d);
-    await planRoute(o, d);
+    const cleanOrigin = cleanLocation(o);
+    const cleanDestination = cleanLocation(d);
+    setOrigin(cleanOrigin);
+    setDestination(cleanDestination);
+    await planRoute(cleanOrigin, cleanDestination);
     navigate("/route");
   };
 
@@ -156,7 +164,7 @@ const RoutePlanner = () => {
         <h3 className="font-headline-lg text-headline-lg text-on-surface mb-space-md">Try a Popular Hyderabad Corridor</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-space-md mb-space-3xl">
           {quickPicks.map(([o, d]) => (
-            <button key={o + d} onClick={() => handleQuickPick(o, d)} disabled={loading}
+            <button key={o + d} type="button" onClick={() => handleQuickPick(o, d)} disabled={loading}
               className="text-left bg-surface-container-lowest rounded-xl p-space-lg shadow-sm border border-surface-variant hover:shadow-md hover:-translate-y-0.5 transition-all disabled:opacity-50">
               <h4 className="font-headline-sm text-headline-sm text-on-surface leading-snug">{o.split(",")[0]} → {d.split(",")[0]}</h4>
               <p className="font-body-sm text-on-surface-variant mt-space-sm">Tap to run a real, live risk analysis on this route.</p>

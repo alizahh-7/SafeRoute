@@ -3,6 +3,7 @@ import { X, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { RouteSegment } from "../types/route";
 import SegmentRiskBadge from "./SegmentRiskBadge";
+import RoadDamageImage from "./RoadDamageImage";
 import "./SegmentDetailDrawer.css";
 
 interface Props {
@@ -82,17 +83,12 @@ const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
                   
                   <div className="damage-info flex gap-4 mt-4">
                     {segment.image_url && (
-                      <div className="damage-thumbnail-wrapper overflow-hidden rounded-xl">
-                        <motion.img 
-                          whileHover={{ scale: 1.1 }}
-                          transition={{ duration: 0.3 }}
-                          src={segment.image_url} 
-                          alt="Road damage" 
-                          className="damage-thumbnail" 
-                        />
+                      <div className="damage-thumbnail-wrapper">
+                        <RoadDamageImage src={segment.image_url} alt="Road damage detection source" className="aspect-[4/3] w-32">
                         {segment.vision_source === "rdd2022_sample" && (
                           <span className="sample-label">Sample Image</span>
                         )}
+                        </RoadDamageImage>
                       </div>
                     )}
                     <div>

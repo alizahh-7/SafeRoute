@@ -1,45 +1,244 @@
-//frontend/src/pages/RealTimeHazardRerouteAdvisory.tsx
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Check, ChevronLeft, CloudRain, MapPin, Navigation, Radio, ShieldCheck, Volume2 } from "lucide-react";
-import type { RouteSegment } from "../types/route";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Check, ChevronLeft, CloudRain, MapPin, Navigation, Radio, ShieldCheck, Volume2, CheckCircle2, VolumeX } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useRouteContext } from "../context/RouteContext";
+import HazardMap from "../components/HazardMap";
+import { buildRouteGeometry } from "../components/RouteMap";
+import type { RouteSegment } from "../types/route";
+import type { LatLngTuple } from "leaflet";
 
 const shell = "w-full max-w-[1440px] mx-auto px-layout-margin-mobile md:px-layout-margin-tablet lg:px-layout-margin-desktop";
-const risk = (score: number) => score >= 75 ? "text-[#B93535] bg-[#F9EAEA] border-[#B93535]/20" : score >= 50 ? "text-[#D36128] bg-[#FAEEE8] border-[#D36128]/20" : "text-[#2E7D5B] bg-[#EBF4EF] border-[#2E7D5B]/20";
 
-export default function RealTimeHazardRerouteAdvisory() {
-  const { routeData } = useRouteContext();
-  const segments = routeData?.segments ?? [];
-  const [accepted, setAccepted] = useState(false);
-  const [voiceOn, setVoiceOn] = useState(false);
-  const navigate = useNavigate();
-  useEffect(() => { document.title = "REAL-TIME HAZARD & REROUTE ADVISORY | SafeRoute Telangana"; }, []);
-  const direct = useMemo(() => segments.reduce<RouteSegment | null>((worst, item) => !worst || item.final_score > worst.final_score ? item : worst, null), [segments]);
-  const safer = useMemo(() => segments.reduce<RouteSegment | null>((best, item) => !best || item.final_score < best.final_score ? item : best, null), [segments]);
-  const delay = direct ? Math.max(4, Math.round(direct.final_score / 3)) : 0;
-
-  if (!direct || !safer) return <div className="pt-20 min-h-screen bg-background"><div className={`${shell} pt-space-2xl`}><div className="bg-surface-container-lowest rounded-xl p-space-xl">Evaluating available route signals…</div></div></div>;
-  return <div className="pt-20 min-h-screen bg-surface-container relative overflow-hidden">
-    <div className="absolute inset-0 opacity-60 bg-[radial-gradient(circle_at_25%_20%,rgba(253,199,86,.32),transparent_25%),radial-gradient(circle_at_80%_48%,rgba(185,53,53,.16),transparent_28%)]" />
-    <div className={`${shell} relative py-space-xl md:py-space-2xl`}>
-      <div className="flex flex-wrap justify-between gap-space-sm font-body-sm text-on-surface-variant mb-space-md"><Link to="/route" className="inline-flex gap-space-xs items-center hover:text-on-surface"><ChevronLeft size={16}/> Back to route results</Link><span>Source: route adapter · no dispatch endpoint exposed</span></div>
-      <section className="max-w-[1120px] mx-auto rounded-[2rem] overflow-hidden border border-surface-variant bg-surface-container-lowest shadow-[0_24px_48px_-8px_rgba(26,26,24,.14)]">
-        <div className="bg-[#C92325] text-white px-space-lg py-space-xs font-label-caps-micro uppercase flex justify-between gap-space-md"><span className="inline-flex items-center gap-space-xs"><Radio size={13}/> Live hazard intercept · route safety review</span><span className="hidden sm:inline">Route advisory active</span></div>
-        <div className="p-space-lg md:p-space-xl">
-          <div className="flex flex-col md:flex-row md:justify-between gap-space-lg"><div><span className="inline-flex px-space-sm py-space-2xs bg-[#F9EAEA] text-[#B93535] rounded-full font-label-caps-micro uppercase">Critical dynamic blackspot</span><h1 className="font-headline-lg mt-space-sm max-w-2xl">REAL-TIME HAZARD &amp; REROUTE ADVISORY</h1><p className="font-body-md text-on-surface-variant mt-space-xs">Highest current risk is concentrated at {direct.road_name}. The recommendation below is recomputed from the loaded route segments.</p><div className="flex items-center gap-space-xs mt-space-md font-body-sm"><MapPin size={16} className="text-[#B93535]"/> {direct.road_name} <span className="text-secondary">• {direct.midpoint.lat.toFixed(4)}, {direct.midpoint.lng.toFixed(4)}</span></div></div><div className={`min-w-44 self-start p-space-md rounded-xl border ${risk(direct.final_score)}`}><span className="font-label-caps-micro uppercase block">Severity level</span><div className="flex items-end gap-space-xs mt-space-xs"><strong className="text-4xl">{direct.final_score}</strong><span className="font-body-sm mb-1">/100</span></div><span className="font-body-sm">AI risk score</span></div></div>
-          <div className="mt-space-lg"><div className="flex justify-between items-center font-label-caps-micro uppercase text-on-surface-variant"><span>Triangulated multi-modal telemetry</span><span className="text-secondary">{[direct.waterlogging_flag, direct.news_flags?.length, direct.vision_severity !== "none"].filter(Boolean).length} verified signals</span></div><div className="grid grid-cols-1 md:grid-cols-3 gap-space-md mt-space-sm">
-            <Signal icon={<CloudRain size={18}/>} title="Drainage & weather" value={direct.waterlogging_flag ? "Waterlogging detected" : "No inundation flag"} detail={direct.waterlogging_flag ? "Environmental risk modifier is active for this segment." : "No live weather endpoint is available."} tone={direct.waterlogging_flag ? "text-[#B93535]" : "text-[#2E7D5B]"}/>
-            <Signal icon={<Navigation size={18}/>} title="Traffic & route state" value={`${direct.traffic_level} traffic`} detail={`Historical risk score: ${direct.historical_score}/100. Current traffic is retained from the route adapter.`} tone="text-secondary"/>
-            <Signal icon={<AlertTriangle size={18}/>} title="Incident & vision" value={direct.news_flags?.[0] ?? `${direct.vision_severity} surface signal`} detail={direct.news_flags?.length ? "Incident headline is attached to the loaded route data." : "No local incident headline is attached."} tone={direct.news_flags?.length ? "text-[#B93535]" : "text-secondary"}/>
-          </div></div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-space-lg mt-space-xl"><article className="rounded-[1.75rem] bg-surface-container-low p-space-lg border-t-4 border-[#B93535]"><div className="flex justify-between gap-space-sm"><div><span className="font-label-caps-micro text-[#B93535] uppercase">Current route · hazard impending</span><h2 className="font-headline-md mt-space-xs">{direct.road_name}</h2><p className="font-body-sm text-on-surface-variant">Direct route segment with the highest fused risk score.</p></div><span className="font-label-caps-micro text-[#B93535]">RISK: {direct.final_score}/100</span></div><div className="mt-space-md h-2 rounded-full bg-[#F2D3D3]"><div className="h-full rounded-full bg-[#B93535]" style={{width:`${direct.final_score}%`}}/></div><div className="mt-space-md p-space-md rounded-xl bg-surface-container-lowest"><div className="flex justify-between"><span className="font-body-sm text-on-surface-variant">Estimated travel impact</span><b className="text-[#B93535]">+{delay} mins</b></div><p className="font-body-sm text-on-surface-variant mt-space-xs">{direct.explanation}</p></div><button onClick={() => navigate(`/segment/${direct.segment_id}`)} className="mt-space-md w-full py-space-sm rounded-full bg-surface-container-high font-body-sm hover:bg-surface-container">Inspect risk breakdown</button></article>
-          <article className="rounded-[1.75rem] bg-surface-container-lowest p-space-lg border-t-4 border-secondary shadow-sm"><div className="flex justify-between gap-space-sm"><div><span className="inline-flex items-center gap-space-2xs font-label-caps-micro text-secondary uppercase"><ShieldCheck size={14}/> SafeRoute recommended</span><h2 className="font-headline-md mt-space-xs">Via {safer.road_name}</h2><p className="font-body-sm text-on-surface-variant">Lowest-risk alternative among the available route segments.</p></div><span className="font-label-caps-micro text-[#2E7D5B]">RISK: {safer.final_score}/100</span></div><div className="mt-space-md h-2 rounded-full bg-surface-container"><div className="h-full rounded-full bg-secondary-container" style={{width:`${Math.max(8, safer.final_score)}%`}}/></div><div className="mt-space-md p-space-md rounded-xl bg-surface-container-low"><div className="flex justify-between"><span className="font-body-sm text-on-surface-variant">Projected reroute time</span><b>{40 + Math.round(safer.final_score / 3)} mins</b></div><div className="grid grid-cols-2 gap-space-xs mt-space-sm font-body-sm text-on-surface-variant"><span><Check size={14} className="inline text-[#2E7D5B]"/> Lower risk</span><span><Check size={14} className="inline text-[#2E7D5B]"/> Route data verified</span><span><Check size={14} className="inline text-[#2E7D5B]"/> Fewer hazards</span><span><Check size={14} className="inline text-[#2E7D5B]"/> Safer surface</span></div></div><button onClick={() => { setAccepted(true); navigate(`/segment/${safer.segment_id}`); }} className="mt-space-md w-full py-space-sm rounded-full bg-secondary-container text-on-secondary-container font-body-md font-semibold inline-flex items-center justify-center gap-space-xs">Accept safer reroute <ArrowRight size={17}/></button></article></div>
-          <div className="mt-space-lg p-space-md rounded-xl bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm"><button onClick={() => setVoiceOn(!voiceOn)} className="font-body-sm inline-flex items-center gap-space-xs"><span className={`w-8 h-5 rounded-full p-0.5 ${voiceOn ? "bg-secondary" : "bg-outline-variant"}`}><span className={`block w-4 h-4 rounded-full bg-white transition-transform ${voiceOn ? "translate-x-3" : ""}`}/></span><Volume2 size={15}/> Voice advisory {voiceOn ? "enabled" : "disabled"}</button><span className="font-body-sm text-on-surface-variant">{accepted ? "Reroute accepted — opening segment diagnostics." : "Recommendation is ready for driver review."}</span></div>
-        </div>
-      </section>
-    </div>
-  </div>;
+// Real distance in meters between two lat/lng points — used for the live countdown.
+function distanceMeters(a: LatLngTuple, b: LatLngTuple): number {
+  const R = 6371000;
+  const dLat = ((b[0] - a[0]) * Math.PI) / 180;
+  const dLng = ((b[1] - a[1]) * Math.PI) / 180;
+  const lat1 = (a[0] * Math.PI) / 180;
+  const lat2 = (b[0] * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-function Signal({ icon, title, value, detail, tone }: { icon: React.ReactNode; title: string; value: string; detail: string; tone: string }) { return <article className="p-space-md rounded-xl bg-surface-container-low"><div className={`inline-flex items-center gap-space-xs ${tone}`}><span>{icon}</span><span className="font-label-caps-micro uppercase">{title}</span></div><h3 className="font-body-md font-semibold mt-space-sm">{value}</h3><p className="font-body-sm text-on-surface-variant mt-space-xs">{detail}</p></article>; }
+function speak(text: string) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 1.02;
+  utterance.pitch = 1;
+  window.speechSynthesis.speak(utterance);
+}
+
+type Phase = "approaching" | "arrived" | "rerouted";
+
+export default function RealTimeHazardRerouteAdvisory() {
+  const { routeData, alternateData, acceptAlternateRoute } = useRouteContext();
+  const segments = routeData?.segments ?? [];
+  const [voiceOn, setVoiceOn] = useState(false);
+  const [phase, setPhase] = useState<Phase>("approaching");
+  const [pointIndex, setPointIndex] = useState(0);
+  const hasSpokenArrival = useRef(false);
+
+  useEffect(() => { document.title = "REAL-TIME HAZARD & REROUTE ADVISORY | SafeRoute Telangana"; }, []);
+
+  const direct = useMemo(
+    () => segments.reduce<RouteSegment | null>((worst, item) => !worst || item.final_score > worst.final_score ? item : worst, null),
+    [segments],
+  );
+
+  const hasAlternate = Boolean(alternateData?.alternate_available && alternateData.should_suggest_alternate && alternateData.alternate_segments?.length);
+
+  function interpolate(points: LatLngTuple[], stepsBetween = 12): LatLngTuple[] {
+    if (points.length < 2) return points;
+
+    const out: LatLngTuple[] = [];
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const [lat1, lng1] = points[i];
+      const [lat2, lng2] = points[i + 1];
+
+      for (let s = 0; s < stepsBetween; s++) {
+        const t = s / stepsBetween;
+        out.push([
+          lat1 + (lat2 - lat1) * t,
+          lng1 + (lng2 - lng1) * t,
+        ]);
+      }
+    }
+
+    out.push(points[points.length - 1]);
+
+    return out;
+  }
+
+  const approachPath = useMemo(
+    () => interpolate(direct ? (direct.coordinates as LatLngTuple[]) : []),
+    [direct],
+  );
+
+  const alternatePath = useMemo(
+    () =>
+      hasAlternate
+        ? interpolate(buildRouteGeometry(alternateData!.alternate_segments!))
+        : [],
+    [hasAlternate, alternateData],
+  );
+
+  const activePath = phase === "rerouted" ? alternatePath : approachPath;
+  const vehiclePosition: LatLngTuple | null = activePath[pointIndex] ?? activePath[activePath.length - 1] ?? null;
+
+  const distanceToHazard = useMemo(() => {
+    if (phase !== "approaching" || !approachPath.length) return 0;
+    let remaining = 0;
+    for (let i = pointIndex; i < approachPath.length - 1; i++) {
+      remaining += distanceMeters(approachPath[i], approachPath[i + 1]);
+    }
+    return Math.round(remaining);
+  }, [phase, pointIndex, approachPath]);
+
+  // Drive the animation along whichever path is currently active.
+  useEffect(() => {
+    if (!activePath.length || phase === "arrived") return;
+    const timer = window.setInterval(() => {
+      setPointIndex((current) => {
+        const next = current + 1;
+        if (next >= activePath.length) {
+          window.clearInterval(timer);
+          setPhase((p) => (p === "rerouted" ? "arrived" : p));
+          return current;
+        }
+        return next;
+      });
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [activePath, phase]);
+
+  // Speak once when the hazard is imminent (near the end of the approach path).
+  useEffect(() => {
+    if (!voiceOn || !direct || phase !== "approaching") return;
+    const nearHazard = distanceToHazard > 0 && distanceToHazard < 80;
+    if (nearHazard) {
+      speak(`Caution. ${direct.explanation}. Risk score ${direct.final_score} out of 100 near ${direct.road_name}.`);
+    }
+  }, [voiceOn, distanceToHazard, direct, phase]);
+
+  if (!direct) {
+    return <div className="pt-20 min-h-screen bg-background"><div className={shell + " pt-space-2xl"}>Evaluate a route before opening the live advisory.</div></div>;
+  }
+
+  const acceptRoute = () => {
+    if (!acceptAlternateRoute()) return;
+    setPhase("rerouted");
+    setPointIndex(0);
+    hasSpokenArrival.current = false;
+    if (voiceOn) speak("Safer route accepted. Rerouting now.");
+  };
+
+  useEffect(() => {
+    if (phase === "arrived" && voiceOn && !hasSpokenArrival.current) {
+      hasSpokenArrival.current = true;
+      speak("You are now on the safer route.");
+    }
+  }, [phase, voiceOn]);
+
+  const riskTone = direct.final_score >= 75 ? "text-[#B93535]" : "text-[#D36128]";
+  const progressPct = activePath.length > 1 ? Math.round((pointIndex / (activePath.length - 1)) * 100) : 0;
+
+  return <div className="pt-20 min-h-screen bg-surface-container"><div className={shell + " py-space-xl"}>
+    <div className="flex justify-between font-body-sm text-on-surface-variant"><Link to="/route" className="inline-flex gap-space-xs items-center"><ChevronLeft size={16}/>Back to route results</Link><span>Route-signal advisory</span></div>
+    <section className="mt-space-md overflow-hidden rounded-[2rem] bg-surface-container-lowest border border-surface-variant shadow-xl">
+      <div className={"px-space-lg py-space-xs text-white font-label-caps-micro uppercase flex justify-between " + (phase !== "approaching" ? "bg-[#2E7D5B]" : "bg-[#C92325]")}>
+        <span><Radio size={13} className="inline mr-1"/>{phase === "approaching" ? "Live hazard intercept" : phase === "rerouted" ? "Rerouting in progress" : "Reroute complete"}</span>
+        <span>{phase === "approaching" ? `Approaching · ${progressPct}%` : phase === "rerouted" ? `En route · ${progressPct}%` : "Arrived"}</span>
+      </div>
+      <div className="p-space-lg md:p-space-xl">
+        <div className="flex flex-col md:flex-row justify-between gap-space-lg">
+          <div>
+            <span className={"font-label-caps-micro uppercase " + (phase === "approaching" ? "text-[#B93535]" : "text-[#2E7D5B]")}>
+              {phase === "approaching" ? "Highest-risk loaded segment" : phase === "rerouted" ? "Vehicle transitioning" : "Reroute confirmed"}
+            </span>
+            <h1 className="font-headline-lg mt-space-xs">REAL-TIME HAZARD & REROUTE ADVISORY</h1>
+            <p className="font-body-md text-on-surface-variant mt-space-xs">
+              {phase === "approaching"
+                ? `Simulated vehicle is approaching ${direct.road_name}. Watch the live map below.`
+                : phase === "rerouted"
+                  ? "Your vehicle is now moving along the safer alternate route."
+                  : "You've arrived on the safer route. This page and Route Results are now in sync."}
+            </p>
+            <p className="font-body-sm mt-space-sm"><MapPin size={15} className="inline text-[#B93535]"/> {direct.midpoint.lat.toFixed(4)}, {direct.midpoint.lng.toFixed(4)}</p>
+          </div>
+          {phase === "approaching" && (
+            <div className={"rounded-xl bg-[#F9EAEA] p-space-lg min-w-40 " + riskTone}>
+              <span className="font-label-caps-micro">RISK SCORE</span>
+              <b className="block text-5xl">{direct.final_score}</b>
+              <span className="font-body-sm">/100</span>
+              <div className="mt-space-sm font-body-sm text-on-surface">{distanceToHazard} m ahead</div>
+            </div>
+          )}
+        </div>
+
+        {phase === "approaching" && (
+          <div className="mt-space-md h-2 rounded-full bg-surface-container-low overflow-hidden">
+            <div className="h-full bg-[#B93535] transition-all duration-500" style={{ width: `${progressPct}%` }} />
+          </div>
+        )}
+
+        <section className="mt-space-lg h-[420px] overflow-hidden rounded-[1.75rem] border border-surface-variant">
+          <HazardMap
+            routeSegments={segments}
+            hazardSegment={direct}
+            alternateSegments={hasAlternate ? alternateData?.alternate_segments : null}
+            rerouted={phase !== "approaching"}
+            vehiclePosition={vehiclePosition}
+          />
+        </section>
+        <p className="font-body-sm text-on-surface-variant text-center mt-space-xs">
+          {phase === "rerouted" || phase === "arrived"
+            ? "Green is your active route. The dark marker is your simulated position."
+            : hasAlternate
+              ? "Gold is the active route; dashed green is the backend-scored safer alternate. The dark marker shows simulated approach."
+              : "Gold is the active route. The red ring marks the current hazard."}
+        </p>
+
+        {phase === "approaching" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-space-lg mt-space-xl">
+            <article className="rounded-[1.75rem] bg-[#F9EAEA] p-space-lg border-t-4 border-[#B93535]">
+              <span className="font-label-caps-micro text-[#B93535] uppercase">Current route hazard</span>
+              <h2 className="font-headline-md mt-space-xs">{direct.road_name}</h2>
+              <p className="font-body-sm text-on-surface-variant mt-space-sm">{direct.explanation}</p>
+              <div className="grid grid-cols-2 gap-space-sm mt-space-md font-body-sm">
+                <span><CloudRain size={14} className="inline"/> {direct.waterlogging_flag ? "Waterlogging" : "Drainage clear"}</span>
+                <span><Navigation size={14} className="inline"/> {direct.traffic_level} traffic</span>
+              </div>
+            </article>
+            <article className="rounded-[1.75rem] bg-surface-container-low p-space-lg border-t-4 border-secondary">
+              <span className="font-label-caps-micro text-secondary uppercase"><ShieldCheck size={14} className="inline"/> Safer route recommendation</span>
+              <h2 className="font-headline-md mt-space-xs">{hasAlternate ? "Backend-scored alternate route" : "Alternate route unavailable"}</h2>
+              <p className="font-body-sm text-on-surface-variant mt-space-sm">{hasAlternate ? "Alternate risk: " + alternateData?.alternate_risk + "/100, with " + alternateData?.extra_time_minutes + " additional minute(s)." : "The backend has not found an alternate that meets the safety and time threshold for this route."}</p>
+              <div className="grid grid-cols-2 gap-space-xs mt-space-md font-body-sm">
+                <span><Check size={14} className="inline text-[#2E7D5B]"/> Lower exposure</span>
+                <span><Check size={14} className="inline text-[#2E7D5B]"/> Real route geometry</span>
+              </div>
+              <button disabled={!hasAlternate} type="button" onClick={acceptRoute} className="btn btn-primary mt-space-lg w-full disabled:opacity-50">Accept safer reroute <ArrowRight size={16}/></button>
+            </article>
+          </div>
+        )}
+
+        {phase === "arrived" && (
+          <div className="mt-space-xl rounded-[1.75rem] bg-[#EAF5EF] border-t-4 border-[#2E7D5B] p-space-lg flex items-center gap-space-md">
+            <CheckCircle2 className="text-[#2E7D5B] shrink-0" size={28} />
+            <div>
+              <h2 className="font-headline-md">You're on the safer route now</h2>
+              <p className="font-body-sm text-on-surface-variant mt-space-2xs">This page and Route Results now reflect the same active route.</p>
+            </div>
+            <Link to="/route" className="btn btn-outline ml-auto shrink-0">View in Route Results</Link>
+          </div>
+        )}
+
+        <button type="button" onClick={() => setVoiceOn(!voiceOn)} className="mt-space-lg font-body-sm inline-flex gap-space-xs items-center">
+          {voiceOn ? <Volume2 size={16}/> : <VolumeX size={16}/>} Voice advisory {voiceOn ? "enabled" : "disabled"}
+        </button>
+      </div>
+    </section>
+  </div></div>;
+}

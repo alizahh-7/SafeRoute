@@ -10,6 +10,7 @@ vision_severity in Umaima's segment JSON.
 import glob
 import os
 import random
+from pathlib import Path
 
 import requests
 
@@ -19,7 +20,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 MAPILLARY_TOKEN = os.getenv("MAPILLARY_TOKEN")
-FALLBACK_IMAGES = glob.glob("data/india_subset/test/images/*.jpg")
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+FALLBACK_IMAGES = glob.glob(str(BACKEND_DIR / "data" / "india_subset" / "test" / "images" / "*.jpg"))
 
 
 def get_street_image_near(lat: float, lon: float, radius: int = 50):
@@ -93,6 +95,7 @@ def get_segment_vision_severity(model, lat: float, lon: float):
         fallback_img = random.choice(FALLBACK_IMAGES)
         detections = detect_damage(model, fallback_img)
         source = "rdd2022_sample"
+        image_url = fallback_img
     else:
         return "none", "no_image_available"
 
@@ -118,6 +121,7 @@ def get_segment_vision_severity_multi(model, coordinates):
         fallback_img = random.choice(FALLBACK_IMAGES)
         detections = detect_damage(model, fallback_img)
         source = "rdd2022_sample"
+        image_url = fallback_img
     else:
         return "none", "no_image_available", None
 

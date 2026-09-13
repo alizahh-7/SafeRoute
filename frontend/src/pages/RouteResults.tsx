@@ -1,19 +1,25 @@
 //frontend/src/pages/RouteResults.tsx
 
-import { useState } from "react";
-import { Navigation, ShieldCheck, AlertTriangle, Zap, Eye, CheckCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Navigation, ShieldCheck, AlertTriangle, Zap, Eye, CheckCircle, Pause, Play, Square } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useRouteContext } from "../context/RouteContext";
 import RouteMap from "../components/RouteMap";
 import SegmentDetailDrawer from "../components/SegmentDetailDrawer";
 import SegmentRiskBadge from "../components/SegmentRiskBadge";
 import type { RouteSegment } from "../types/route";
+import { buildRouteGeometry } from "../components/RouteMap";
+import type { LatLngTuple } from "leaflet";
 
 const riskColor = (score: number) => score >= 75 ? "#B93535" : score >= 50 ? "#D36128" : score >= 30 ? "#D99B26" : "#2E7D5B";
 
 const RouteResults = () => {
-  const { routeData, alternateData, origin, destination, loading, error } = useRouteContext();
+  const { routeData, alternateData, origin, destination, loading, error, acceptAlternateRoute } = useRouteContext();
   const [activeSegment, setActiveSegment] = useState<RouteSegment | null>(null);
+  const [driveIndex, setDriveIndex] = useState(0);
+  const [driving, setDriving] = useState(false);
+  const [driveAlert, setDriveAlert] = useState<RouteSegment | null>(null);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
   if (loading) return <div className="pt-32 text-center font-body-lg">Analyzing your route with real data...</div>;
   if (error) return <div className="pt-32 text-center font-body-lg text-error">{error}</div>;
@@ -29,12 +35,42 @@ const RouteResults = () => {
   const hazardCount = segments.filter(s => s.waterlogging_flag || s.news_flags?.length || s.vision_severity !== "none").length;
   const worstSegment = segments.reduce((worst, s) => !worst || s.final_score > worst.final_score ? s : worst, segments[0]);
   const showAlternate = alternateData?.alternate_available && alternateData.should_suggest_alternate;
+  const routePoints = useMemo(() => buildRouteGeometry(segments), [segments]);
+  const drivePosition: LatLngTuple | null = routePoints[driveIndex] ?? null;
+
+  useEffect(() => {
+    if (!driving || !routePoints.length) return;
+    const timer = window.setInterval(() => {
+      setDriveIndex((current) => {
+        const next = current + 1;
+        if (next >= routePoints.length) { setDriving(false); return current; }
+        const approaching = segments.find((segment) =>
+          !dismissedIds.has(segment.segment_id) &&
+          segment.coordinates.some(([lat, lng]) => Math.abs(lat - routePoints[next][0]) < 0.00015 && Math.abs(lng - routePoints[next][1]) < 0.00015)
+          && (segment.final_score >= 50 || segment.waterlogging_flag || Boolean(segment.news_flags?.length))
+        );
+        if (approaching) {
+          setDriveAlert(approaching);
+          setDriving(false);
+        }
+        return next;
+      });
+    }, 700);
+    return () => window.clearInterval(timer);
+  }, [driving, routePoints, segments, dismissedIds]);
+
+  const stopDrive = () => { setDriving(false); setDriveIndex(0); setDriveAlert(null); setDismissedIds(new Set()); };
+  const continueDrive = () => {
+    if (driveAlert) setDismissedIds((prev) => new Set(prev).add(driveAlert.segment_id));
+    setDriveAlert(null);
+    setDriving(true);
+  };
+  const acceptReroute = () => { if (acceptAlternateRoute()) stopDrive(); };
 
   return (
     <div className="w-full pt-20 bg-background min-h-screen pb-space-3xl">
       <div className="max-w-[1440px] mx-auto px-layout-margin-mobile md:px-layout-margin-tablet lg:px-layout-margin-desktop pt-space-xl">
 
-        {/* Header */}
         <div className="flex justify-between items-end flex-wrap gap-space-md mb-space-xl">
           <div className="flex flex-col gap-space-xs">
             <span className="font-label-caps-micro text-label-caps-micro uppercase text-secondary font-bold tracking-widest bg-secondary-container/20 px-space-sm py-space-2xs rounded-full self-start">Real-Data Route Analysis</span>
@@ -46,7 +82,6 @@ const RouteResults = () => {
           </div>
         </div>
 
-        {/* Explanation strip — the actual headline answer, front and center */}
         <div className="rounded-xl border-2 p-space-lg mb-space-xl bg-surface-container-lowest flex flex-col sm:flex-row justify-between gap-space-md items-start sm:items-center" style={{ borderColor: primaryColor }}>
           <div>
             <p className="font-body-md"><b>Riskiest point on this route:</b> {worstSegment.road_name} ({worstSegment.final_score}/100)</p>
@@ -55,7 +90,6 @@ const RouteResults = () => {
           <button onClick={() => setActiveSegment(worstSegment)} className="btn btn-outline shrink-0">Inspect this segment</button>
         </div>
 
-        {/* Alternate route callout, only if genuinely justified */}
         {alternateData?.alternate_available && (
           <div className="rounded-xl p-space-lg mb-space-xl bg-surface-container-low flex items-center gap-space-sm">
             {showAlternate ? (
@@ -74,13 +108,18 @@ const RouteResults = () => {
           </div>
         )}
 
-        {/* Map + Segment list */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
           <div className="lg:col-span-7 flex flex-col gap-space-md">
             <div className="rounded-xl overflow-hidden border border-surface-variant shadow-sm h-[420px]">
-              <RouteMap segments={segments} />
+              <RouteMap segments={segments} alternateSegments={showAlternate ? alternateData?.alternate_segments : null} drivePosition={drivePosition} onSegmentSelect={setActiveSegment} />
             </div>
-            <p className="font-body-sm text-on-surface-variant text-center">Route line is illustrative — segment scores and coordinates below are real.</p>
+            <p className="font-body-sm text-on-surface-variant text-center">Route geometry is drawn from the OpenRouteService coordinates returned for this analysis.</p>
+            <div className="flex flex-wrap items-center gap-space-sm rounded-xl bg-surface-container-low p-space-md">
+              <span className="font-body-sm font-semibold mr-auto">Simulate My Drive</span>
+              <button type="button" onClick={() => setDriving(!driving)} disabled={!routePoints.length} className="btn btn-primary">{driving ? <Pause size={16}/> : <Play size={16}/>} {driving ? "Pause" : driveIndex ? "Resume" : "Start"}</button>
+              <button type="button" onClick={stopDrive} className="btn btn-outline"><Square size={15}/> Stop</button>
+            </div>
+            {driveAlert && <div className="rounded-xl border border-[#D36128]/30 bg-[#FAEEE8] p-space-md"><div className="flex flex-wrap items-center justify-between gap-space-sm"><div><b>Upcoming: {driveAlert.waterlogging_flag ? "waterlogging" : driveAlert.news_flags?.[0] ?? driveAlert.vision_severity + " surface hazard"} near {driveAlert.road_name}</b><p className="font-body-sm mt-space-2xs">Risk {driveAlert.final_score}/100. Choose whether to continue or use the available safer alternate.</p></div><div className="flex gap-space-xs"><button type="button" className="btn btn-outline" onClick={continueDrive}>Continue</button>{showAlternate && <button type="button" className="btn btn-primary" onClick={acceptReroute}>Accept safer route</button>}</div></div></div>}
 
             <div className="bg-surface-container-lowest p-space-md rounded-xl flex items-center gap-space-md border border-surface-variant shadow-sm">
               <div className="w-10 h-10 shrink-0 rounded-full bg-secondary-container/20 flex items-center justify-center text-secondary border border-secondary/30">
@@ -93,7 +132,6 @@ const RouteResults = () => {
             </div>
           </div>
 
-          {/* Segment list */}
           <div className="lg:col-span-5 bg-surface-container-lowest rounded-xl p-space-lg shadow-sm border border-surface-variant flex flex-col">
             <div className="flex justify-between items-center mb-space-lg">
               <div className="font-headline-sm flex items-center gap-space-xs"><Navigation size={18} className="text-secondary"/> Route Segments</div>

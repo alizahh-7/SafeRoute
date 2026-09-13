@@ -4,9 +4,13 @@ The actual web server the frontend calls. Reuses the exact same pipeline
 logic as the root main.py — no duplicated code.
 """
 
-from fastapi import FastAPI
+from pathlib import Path
+from urllib.parse import quote
+
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from main import run_pipeline
 from src.risk_engine.fusion import route_total_risk
 from src.routing.alt_route import suggest_safer_route
@@ -14,9 +18,15 @@ from src.api_clients.geocode import geocode, get_location_suggestions, reverse_g
 from src.news.news_check import get_news_flags
 
 app = FastAPI()
+FALLBACK_IMAGE_DIR = Path(__file__).resolve().parents[1] / "data" / "india_subset" / "test" / "images"
+app.mount("/vision-fallback", StaticFiles(directory=FALLBACK_IMAGE_DIR), name="vision-fallback")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite's default dev port
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -27,8 +37,14 @@ class RouteRequest(BaseModel):
 
 
 @app.post("/route-risk")
-def get_route_risk(req: RouteRequest):
+def get_route_risk(req: RouteRequest, request: Request):
     segments = run_pipeline(req.origin, req.destination)
+    # Local RDD fallback paths are usable by Python but not by the browser.
+    # Expose only the basename through this API's read-only static mount.
+    for segment in segments:
+        if segment.get("vision_source") == "rdd2022_sample" and segment.get("image_url"):
+            filename = quote(Path(segment["image_url"]).name)
+            segment["image_url"] = f"{request.base_url}vision-fallback/{filename}"
     return {
         "route_total_risk": route_total_risk(segments),
         "segments": segments,
