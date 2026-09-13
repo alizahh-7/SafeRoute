@@ -1,39 +1,109 @@
-import { useEffect, useState } from "react";
+//frontend/src/pages/SystemArchitectureMethodology.tsx
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Download, ExternalLink, GitBranch, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
 
 const shell = "w-full max-w-[1440px] mx-auto px-layout-margin-mobile md:px-layout-margin-tablet lg:px-layout-margin-desktop";
-const inferenceFrame = "https://lh3.googleusercontent.com/aida-public/AB6AXuACZUvMTz0OtXlR22Tl2-Tw40jLghaXbD-LyNlSuibkplM1c4eSM2AnjWfKhUvjiE8OgU6W6Q77VcSqSmyX5oCqYXr4XT7Phl_-7FPF6jMlhzAGladG94n5Oty940ZmsL3hf7p2PBav4mqXDrAFoXmFCwbsbdkCejdieGy8JeXlQD6rVrt6bT1QRn9jquLg3JNTPDKcBFC9RdXeWiGct1I7RFNu96jpi67mPsF5EGmioRnZ95aj63t_2A";
+
 const stages = [
-  { n:"01", tag:"ORS Graph Vector", title:"Micro-Segment Polyline Ingestion", text:"OpenRouteService highway linestrings are sliced into discrete topological links at 200m–500m length. Each sub-segment inherits curvature degree, flyover / at-grade elevation metadata, lighting asset IDs, and forward directional bearing vectors.", hud:"ORS LineString Decomposition", value:"Δs = 250m", detail:"Output: Unique Segment Hash, Bearings, Road Class (NH/SH/Urban)" },
-  { n:"02", tag:"IIT-D TRIPP DB", title:"Historical Crash Exposure Weighting", text:"Synthesizes 114 audited Telangana arterial corridors with historical fatal accident density from IIT Delhi’s TRIPP safety registry. Segments are scored using a kernel density estimate modulated by junction complexity, time-of-day lighting, and pedestrian vulnerability indices.", hud:"Corridor Cluster Match", value:"114 Blackspots", detail:"Severity Metric: Fatality Equivalent Weight (FEW) per km²" },
-  { n:"03", tag:"YOLOv8 Edge ONNX", title:"Computer Vision Defect Extraction", text:"Fine-tuned on the RDD2022 India dataset across 5,368 street-level frames. Analyzes nearest Mapillary dashcam imagery for extracting bounding-box densities of severe potholes (D40), longitudinal fractures (D20), and alligator mesh degradation (D00).", hud:"Vision Inference Latency", value:"14.2ms / frame", detail:"Spatial fallback: Neighboring link interpolation when coverage is sparse" },
-  { n:"04", tag:"GHMC IoT + Radar", title:"Hydro-Meteorological & News Ingestion", text:"Ingests 48 GHMC ultrasonic waterlogging transducers deployed across vulnerable low-lying underpasses (Begumpet, Tolichowki, Malakpet). Triangulated with IMD Begumpet Doppler radar and real-time civic RSS alert extraction for police barricades.", hud:"Drainage Sensor Refresh", value:"60s Polling Cycle", detail:"Inundation trigger: Dynamic non-linear penalty for depths > 15cm" },
-];
-const limits = [
-  ["01","SPATIAL SPARSITY","Street-View Crowdsourced Coverage Density","While Hyderabad metropolitan corridors (HITEC City, Outer Ring Road, Gachibowli) possess high Mapillary dashcam frequency (<14 days old), peripheral rural segments across Medchal and Hyderabad display sparse visual updates.","Engineering Fallback: The risk engine automatically decays vision weight (β) to 0.05 and boosts historical blackspot spatial interpolation from nearest cluster corridors."],
-  ["02","OPTICS & ILLUMINATION","Night Vision Accuracy Degradation","Detection accuracy for Class D40 potholes drops by ~18% under poor street-lighting or adverse high-beam backscatter conditions. Shadows cast by roadside neem trees can trigger false-positive longitudinal cracks (D20).","Engineering Fallback: Ephemeris calculations inject a twilight illuminance penalty matrix (λ = 1.35) during night cycles, raising the overall danger score regardless of vision outputs."],
-  ["03","IOT TELEMETRY DELAY","Municipal Ultrasonic Sensor Polling Latency","GHMC drainage monitoring transceivers broadcast packet updates at 60-to-120-second intervals to conserve field solar batteries. Catastrophic flash-inundation events may have a ~2-minute latency gap prior to edge synchronization.","Engineering Fallback: Real-time Doppler rain reflectivity from IMD Begumpet radar proactively tags basins as high risk 10 minutes before ultrasonic transducers register flood thresholds."],
-  ["04","UNPREDICTABLE INCIDENTS","Spontaneous Vehicle Collisions & Sudden Obstacles","SafeRoute Telangana is a statistical and condition-based risk model, not a precognitive collision detector. Sudden vehicle breakdowns or unannounced religious processions occur in moments before arrival by asynchronous police and civic feeds.","Engineering Fallback: Continuously listening transformer-based NLP monitors Hyderabad Traffic Police Twitter and Google News RSS with an average 5–8 min extraction cycle."],
+  { n: "01", tag: "OpenRouteService", title: "Route fetch & segmentation", text: "A user's origin and destination are geocoded (Nominatim/OpenStreetMap), routed via OpenRouteService, and the resulting path is split into road segments, each with its own coordinates and a stable segment ID." },
+  { n: "02", tag: "IIT Delhi + MoRTH", title: "Historical risk scoring", text: "Each segment is scored against real Telangana crash records (IIT Delhi's Mendeley crash dataset) and officially identified MoRTH black spots, weighted by proximity and by day-of-week crash patterns from the same dataset." },
+  { n: "03", tag: "YOLOv8 + Mapillary", title: "Road-surface vision", text: "A YOLOv8 model trained on the RDD2022 road-damage dataset scans a live street-level photo of the segment (fetched from Mapillary where coverage exists), falling back to a labelled RDD2022 sample image when no live photo is available for that exact location." },
+  { n: "04", tag: "Open-Meteo + TomTom", title: "Live weather & traffic", text: "Live rainfall, wind, and visibility (Open-Meteo) and live traffic congestion (TomTom) are pulled per segment. A segment is flagged for waterlogging risk only when it's both currently raining and near a known GHMC/HYDRAA-published waterlogging point." },
+  { n: "05", tag: "Google News RSS", title: "Local news check", text: "Each segment's road/area name is checked against recent Google News results for genuine mentions of accidents, closures, or flooding — filtered so a road name must actually appear in the headline, not just a generic keyword." },
 ];
 
-function Card({children, className=""}:{children:React.ReactNode;className?:string}) { return <article className={`bg-surface-container-lowest border border-surface-variant/70 rounded-xl ${className}`}>{children}</article> }
-export default function SystemArchitectureMethodology(){
-  const [expanded,setExpanded]=useState<string|null>(null); const [downloaded,setDownloaded]=useState(false);
-  useEffect(()=>{document.title="System Architecture, Data Pipeline & Methodology | SafeRoute Telangana"},[]);
-  const download=()=>{const text="SafeRoute Telangana — Multi-Modal Risk Fusion Architecture\n\n"+stages.map(x=>`${x.n}. ${x.title}\n${x.text}`).join("\n\n");const url=URL.createObjectURL(new Blob([text],{type:"text/plain"}));const a=document.createElement("a");a.href=url;a.download="SafeRoute-Technical-Whitepaper.txt";a.click();URL.revokeObjectURL(url);setDownloaded(true)};
-  return <div className="pt-20 pb-space-3xl bg-background min-h-screen"><div className={`${shell} pt-space-xl`}>
-    <div className="flex justify-between items-center gap-space-md font-body-sm text-on-surface-variant"><Link to="/" className="inline-flex items-center gap-space-xs"><ArrowLeft size={16}/> Executive overview</Link><div className="flex gap-space-xs"><span className="hidden sm:inline px-space-sm py-space-2xs rounded-full bg-surface-container-low">Arch Spec v2.4.8 (Production Kernel)</span><span className="px-space-sm py-space-2xs rounded-full bg-secondary-container/50 text-secondary">TRL 7 Validated</span></div></div>
-    <section className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl mt-space-xl"><div className="lg:col-span-8"><span className="font-label-caps-micro uppercase text-secondary">AICW 2024 Capstone Research · Supported by Microsoft</span><h1 className="font-display-hero mt-space-sm">Multi-Modal Risk Fusion Architecture &amp; Algorithmic Methodology</h1><p className="font-body-md text-on-surface-variant mt-space-md max-w-3xl">An empirical, zero-blindspot routing intelligence engine synthesizing 114 verified Telangana crash corridors, high-throughput YOLOv8 edge vision across 5,368 local road defect annotations, ultrasonic GHMC storm-basin telemetry, and automated NLP traffic disruption ingest.</p></div><div className="lg:col-span-4 flex flex-col gap-space-sm self-center"><button onClick={download} className="btn btn-primary w-full"><Download size={16}/>{downloaded?"Technical brief downloaded":"Download Technical Whitepaper (PDF)"}</button><button onClick={()=>setExpanded(expanded==="weights"?null:"weights")} className="btn btn-outline w-full"><GitBranch size={16}/>GitHub Weights &amp; ONNX Pipeline</button><Link to="/analytics" className="btn btn-outline w-full"><ExternalLink size={16}/>Open API Specification &amp; Schema</Link></div></section>
-    {expanded==="weights"&&<div className="mt-space-sm p-space-md rounded-xl bg-secondary-container/20 font-body-sm">Model binaries are not shipped in this frontend repository. This state is ready to receive a secure evaluator artifact URL without changing the page design.</div>}
-    <section className="grid grid-cols-2 lg:grid-cols-4 gap-space-md mt-space-xl">{[["SPATIAL SPLITTING GRANULARITY","200m–500m","Polyline sub-vectors via ORS"],["TRAINED VISION SAMPLES","5,368","RDD2022 India asphalt images"],["MEAN PIPELINE LATENCY","14.2ms","Per segment micro-evaluation"],["INUNDATION TELEMETRY GRID","48 Basins","Real-time GHMC ultrasonic IoT"]].map(x=><Card key={x[0]} className="p-space-lg"><span className="font-label-caps-micro text-on-surface-variant">{x[0]}</span><b className="block text-3xl mt-space-sm">{x[1]}</b><span className="font-body-sm text-on-surface-variant">{x[2]}</span></Card>)}</section>
-    <section className="mt-space-xl p-space-xl bg-surface-container-low rounded-[1.75rem]"><span className="font-label-caps-micro text-secondary uppercase">End-to-end ingestion &amp; calculation core</span><div className="flex flex-col lg:flex-row justify-between gap-space-md"><div><h2 className="font-headline-lg mt-space-xs">5-Stage Deterministic Risk Synthesis Pipeline</h2><p className="font-body-sm text-on-surface-variant mt-space-xs max-w-3xl">From geocoded origin–destination intent to dynamic edge costs in seconds. Every geographic link traverses strict geometric extraction, historical severity indexation, neural surface verification, and live civic telemetry.</p></div><span className="self-start px-space-sm py-space-2xs rounded-full bg-surface-container-lowest font-label-caps-micro text-on-surface-variant"><ShieldCheck size={13} className="inline text-secondary"/> ISO 39001 Road Traffic Safety Compliant</span></div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-space-md mt-space-lg">{stages.slice(0,3).map(s=><Card key={s.n} className="p-space-lg"><div className="flex justify-between font-label-caps-micro text-on-surface-variant"><span>STAGE {s.n}</span><span>{s.tag}</span></div><h3 className="font-headline-sm mt-space-md">{s.title}</h3><p className="font-body-sm text-on-surface-variant mt-space-sm">{s.text}</p><div className="mt-space-lg p-space-sm bg-surface-container-low rounded"><div className="flex justify-between font-label-caps-micro"><span>{s.hud}</span><b className="text-secondary">{s.value}</b></div><p className="font-body-sm text-on-surface-variant mt-space-xs">{s.detail}</p></div></Card>)}
-      <Card className="p-space-lg"><div className="flex justify-between font-label-caps-micro text-on-surface-variant"><span>STAGE 04</span><span>{stages[3].tag}</span></div><h3 className="font-headline-sm mt-space-md">{stages[3].title}</h3><p className="font-body-sm text-on-surface-variant mt-space-sm">{stages[3].text}</p><div className="mt-space-lg p-space-sm bg-surface-container-low rounded"><div className="flex justify-between font-label-caps-micro"><span>{stages[3].hud}</span><b className="text-secondary">{stages[3].value}</b></div><p className="font-body-sm text-on-surface-variant mt-space-xs">{stages[3].detail}</p></div></Card>
-      <Card className="md:col-span-2 p-space-lg"><div className="flex justify-between font-label-caps-micro"><span className="text-secondary">STAGE 05 · DYNAMIC SYNTHESIS</span><span className="text-on-surface-variant">Risk Cost Function</span></div><h3 className="font-headline-sm mt-space-md">The Multi-Modal Explainable Risk Fusion Equation</h3><p className="font-body-sm text-on-surface-variant mt-space-xs">Segments are assigned an actionable safety impedance coefficient (0–100) integrated into OpenRouteService Dijkstra A* dynamic path graph edge cost matrices.</p><div className="mt-space-md p-space-md bg-surface-container-low rounded font-label-code-md">S = (α · H<sub>crash</sub>) + (β · V<sub>vision</sub>) + (γ · W<sub>inundation</sub>) + (δ · N<sub>news</sub>) + θ<sub>flash</sub></div><div className="grid grid-cols-2 lg:grid-cols-4 gap-space-xs mt-space-sm">{[["HISTORICAL BLACKSPOTS","α = 0.30","IIT-D TRIPP Density"],["EDGE COMPUTER VISION","β = 0.35","YOLOv8 Damage Boxes"],["GHMC ULTRASONIC BASIN","γ = 0.20","IoT Water Sensor Basins"],["NLP CIVIC ALERTS","δ = 0.15","Twitter / Police Bulletins"]].map(x=><div key={x[0]} className="p-space-xs bg-surface-container-low rounded"><span className="font-label-caps-micro">{x[0]}</span><b className="block font-body-sm">{x[1]}</b><span className="font-body-sm text-on-surface-variant">{x[2]}</span></div>)}</div><p className="font-body-sm text-on-surface-variant mt-space-sm">Non-linear override: when water depth &gt;15cm, scalar α spikes from 1.0 to 3.8, dynamically repelling vehicular routing regardless of blackspot history.</p></Card></div>
-    </section>
-    <section className="mt-space-2xl"><span className="font-label-caps-micro text-secondary uppercase">Empirical AI validation</span><h2 className="font-headline-lg mt-space-xs">Computer Vision Model Card &amp; Indian Road Benchmark</h2><p className="font-body-sm text-on-surface-variant mt-space-xs">Fine-tuned YOLOv8 neural network trained specifically on Indian asphalt topologies, unsegregated traffic environments, and monsoon-weathered degradation profiles.</p><div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg mt-space-lg"><Card className="lg:col-span-5 p-space-lg"><h3 className="font-headline-sm">Training Specification</h3><div className="mt-space-md divide-y divide-surface-variant">{[["Base Architecture","YOLOv8s (Small) Backbone"],["Target Dataset","RDD2022 India Subset (Crowdsourced)"],["Annotated Frames","5,368 images (80/10/10 split)"],["Input Resolution","640 × 640 × 3 RGB"],["Hardware Optimization","ONNX FP16 Engine (TensorRT Capable)"],["Per-Frame Latency","14.2ms (Edge GPU Fallback: 48ms)"]].map(x=><div key={x[0]} className="flex justify-between gap-space-md py-space-xs font-body-sm"><span>{x[0]}</span><b>{x[1]}</b></div>)}</div><div className="relative mt-space-md"><img src={inferenceFrame} alt="Indian road YOLO detection benchmark" className="h-48 w-full object-cover rounded"/><span className="absolute bottom-space-xs left-space-xs px-space-xs py-space-2xs bg-on-surface text-surface font-label-caps-micro">Inference HUD: D40 Pothole 89.2% Conf</span></div></Card><div className="lg:col-span-7 grid grid-cols-1 gap-space-md"><Card className="p-space-lg"><div className="grid grid-cols-3 gap-space-sm"><div><span className="font-label-caps-micro">CUMULATIVE MODEL PRECISION</span><b className="block text-4xl mt-space-sm">78.4%</b><span className="font-label-caps-micro text-secondary">mAP@0.5 IoU</span></div><div><span className="font-label-caps-micro">IOU 0.5:0.95</span><b className="block text-2xl mt-space-sm">54.2%</b></div><div><span className="font-label-caps-micro">F1 SCORE</span><b className="block text-2xl mt-space-sm">0.835</b></div></div></Card><div className="grid grid-cols-3 gap-space-sm">{[["Class D40","Potholes & Rutting","89.2%","84.6%"],["Class D20","Longitudinal Cracks","86.7%","81.3%"],["Class D00","Alligator Web Cracks","82.1%","79.5%"]].map(x=><Card key={x[0]} className="p-space-md"><span className="font-label-caps-micro text-secondary">{x[0]}</span><h3 className="font-body-sm font-semibold mt-space-xs">{x[1]}</h3><p className="font-body-sm mt-space-sm">Precision: <b>{x[2]}</b></p><div className="h-1.5 rounded bg-surface-container mt-space-xs"><div className="h-full bg-secondary rounded" style={{width:x[2]}}/></div><p className="font-body-sm mt-space-sm">Recall: <b>{x[3]}</b></p></Card>)}</div><Card className="p-space-md bg-secondary-container/20"><b className="font-body-sm">Confusion Matrix Diagnostics</b><p className="font-body-sm text-on-surface-variant">True Positive background discrimination validated against Indian speed breakers and painted shadows. Background FP: &lt; 4.8%.</p></Card></div></div></section>
-    <section className="mt-space-2xl p-space-xl bg-surface-container-low rounded-[1.75rem]"><span className="font-label-caps-micro text-secondary uppercase">Transparent engineering</span><h2 className="font-headline-lg mt-space-xs">Safety Boundary Disclosures &amp; System Limitations</h2><p className="font-body-sm text-on-surface-variant mt-space-xs">In high-stakes civic mobility, algorithmic transparency is paramount. The following four technical constraints define the operating boundaries of SafeRoute Telangana v2.4.</p><div className="grid grid-cols-1 md:grid-cols-2 gap-space-md mt-space-lg">{limits.map(l=><Card key={l[0]} className="p-space-lg"><div className="flex justify-between font-label-caps-micro"><span className="text-secondary">Limitation {l[0]}</span><span className="px-space-xs py-space-2xs rounded-full bg-surface-container-low text-on-surface-variant">{l[1]}</span></div><h3 className="font-headline-sm mt-space-md">{l[2]}</h3><p className="font-body-sm text-on-surface-variant mt-space-sm">{l[3]}</p><div className="mt-space-md p-space-sm rounded bg-surface-container-low font-body-sm"><b className="text-secondary">↔ Engineering Fallback:</b> {l[4].replace("Engineering Fallback: ","")}</div></Card>)}</div></section>
-    <section className="mt-space-2xl"><span className="font-label-caps-micro text-secondary uppercase">Production infrastructure</span><h2 className="font-headline-lg mt-space-xs">Core Technology Ecosystem &amp; Scientific Attributions</h2><div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-space-sm mt-space-lg">{[["⌘","Python / FastAPI","Async web service"],["◈","PyTorch 2.2","Model architecture"],["◉","Ultralytics YOLOv8","Road damage engine"],["♧","OpenRouteService","Dynamic road graph"],["▥","MapLibre GL JS","Vector HUD canvas"],["☁","Microsoft Azure","Compute runtime"],["CSS","Tailwind CSS","Editorial theme"]].map(x=><Card key={x[1]} className="p-space-md text-center"><span className="text-secondary text-xl">{x[0]}</span><b className="block font-body-sm mt-space-xs">{x[1]}</b><span className="font-label-caps-micro text-on-surface-variant">{x[2]}</span></Card>)}</div><Card className="p-space-lg mt-space-lg"><div className="flex justify-between"><h3 className="font-headline-sm">Academic References &amp; Data Provenance</h3><span className="font-label-caps-micro text-secondary">INSTITUTIONAL ATTRIBUTION</span></div><div className="font-body-sm text-on-surface-variant space-y-space-sm mt-space-md"><p>[1] Transportation Research and Injury Prevention Programme (TRIPP), Indian Institute of Technology Delhi (IIT-D). “Spatial Identification and Risk Weighting of Arterial Crash Blackspots across Telangana State Highway Corridors”, 2021–2023.</p><p>[2] Arya, D. et al. “Global Road Damage Detection: Crowdsourced RDD2022 Benchmark Dataset for Autonomous Defect Categorization”, IEEE Transactions on Intelligent Transportation Systems, 2022.</p><p>[3] Greater Hyderabad Municipal Corporation (GHMC) Smart City Mission. “Urban Drainage Telemetry &amp; Flood Basin Sensing Protocol Documentation (Begumpet, Tolichowki, Malakpet basins)”.</p></div></Card></section>
-  </div></div>
+const fusionWeights = [
+  ["Historical base score", "0–100", "Black-spot proximity + nearby crash density + day-of-week pattern"],
+  ["Live weather", "+0 to +20", "Added when current rain/wind crosses a threshold"],
+  ["Live traffic", "+0 to +20", "Added based on live congestion level"],
+  ["Waterlogging flag", "+15", "Added only when raining near a known waterlogging point"],
+  ["Vision severity", "+0 to +22", "Added based on detected road-surface damage"],
+  ["News flag", "+8", "Added when a genuine, relevant local headline is found"],
+];
+
+const limits = [
+  ["01", "SPARSE HISTORICAL COVERAGE", "Crash data density varies by area", "The IIT Delhi dataset has 114 Telangana records out of a national dataset — dense enough for some corridors, sparse for others. A 0 historical score on a quiet segment usually reflects data sparsity, not verified safety.", "We show the score as-is rather than inventing confidence we don't have, and note this limitation explicitly here."],
+  ["02", "STREET-VIEW COVERAGE GAPS", "Mapillary doesn't cover every road", "Crowdsourced street photography is denser on major Hyderabad roads than on smaller side streets.", "When no live photo exists for a segment, the app runs vision on a labelled RDD2022 sample image instead and marks the source honestly as a fallback, never as a live match."],
+  ["03", "NO LIVE ACCIDENT OR DRAINAGE SENSOR FEED", "Some signals don't exist publicly in India", "There's no public real-time accident-report API, and no public live drainage-sensor feed for Hyderabad.", "Waterlogging risk is estimated using a known static list of flood-prone points combined with live rainfall — a reasonable proxy, not a live sensor reading, and stated as such."],
+  ["04", "ONE DATA POINT CAN DOMINATE A SHORT ROUTE", "Short routes may see sparse signal", "On a short city route, only one or two real black spots may fall within range, so a couple of segments can carry most of the historical signal for that trip.", "This is disclosed rather than smoothed over — the explanation text always names exactly which factors contributed to a score."],
+];
+
+export default function SystemArchitectureMethodology() {
+  useEffect(() => { document.title = "System Architecture & Methodology | SafeRoute Telangana"; }, []);
+
+  return (
+    <div className="pt-20 pb-space-3xl bg-background min-h-screen">
+      <div className={`${shell} pt-space-xl`}>
+        <Link to="/" className="font-body-sm inline-flex items-center gap-space-xs text-on-surface-variant"><ArrowLeft size={16}/> Back to overview</Link>
+
+        <section className="mt-space-xl">
+          <span className="font-label-caps-micro uppercase text-secondary">AICW Capstone · How SafeRoute actually works</span>
+          <h1 className="font-display-hero mt-space-sm">System Architecture & Methodology</h1>
+          <p className="font-body-md text-on-surface-variant mt-space-md max-w-3xl">Every signal below is real and traceable to a named source — no simulated or randomly generated data drives the score you see in the app.</p>
+        </section>
+
+        <section className="mt-space-xl p-space-xl bg-surface-container-low rounded-[1.75rem]">
+          <span className="font-label-caps-micro text-secondary uppercase">Five-stage pipeline</span>
+          <h2 className="font-headline-lg mt-space-xs">From a typed-in route to an explainable score</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-space-md mt-space-lg">
+            {stages.map((s) => (
+              <article key={s.n} className="bg-surface-container-lowest border border-surface-variant rounded-xl p-space-lg">
+                <div className="flex justify-between font-label-caps-micro text-on-surface-variant">
+                  <span>STAGE {s.n}</span><span>{s.tag}</span>
+                </div>
+                <h3 className="font-headline-sm mt-space-md">{s.title}</h3>
+                <p className="font-body-sm text-on-surface-variant mt-space-sm">{s.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-space-2xl p-space-xl bg-surface-container-low rounded-[1.75rem]">
+          <span className="font-label-caps-micro text-secondary uppercase">The fusion formula</span>
+          <h2 className="font-headline-lg mt-space-xs">How the 0–100 score is actually built</h2>
+          <p className="font-body-sm text-on-surface-variant mt-space-xs max-w-2xl">Each segment starts with a historical base score, then live signals add points on top — capped at 100. Every score shown in the app includes a plain-language list of exactly which of these fired.</p>
+          <div className="mt-space-lg divide-y divide-surface-variant bg-surface-container-lowest rounded-xl border border-surface-variant">
+            {fusionWeights.map((w) => (
+              <div key={w[0]} className="flex flex-col sm:flex-row sm:justify-between gap-space-xs p-space-md">
+                <span className="font-body-sm font-semibold">{w[0]}</span>
+                <span className="font-label-code-md text-secondary">{w[1]}</span>
+                <span className="font-body-sm text-on-surface-variant sm:max-w-md">{w[2]}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-space-2xl p-space-xl bg-surface-container-low rounded-[1.75rem]">
+          <span className="font-label-caps-micro text-secondary uppercase">Stated honestly</span>
+          <h2 className="font-headline-lg mt-space-xs">Known limitations</h2>
+          <p className="font-body-sm text-on-surface-variant mt-space-xs max-w-2xl">Real-world data has real gaps. Rather than hide them, here's exactly where they are and how the system handles them.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md mt-space-lg">
+            {limits.map((l) => (
+              <article key={l[0]} className="bg-surface-container-lowest border border-surface-variant rounded-xl p-space-lg">
+                <div className="flex justify-between font-label-caps-micro">
+                  <span className="text-secondary">Limitation {l[0]}</span>
+                  <span className="px-space-xs py-space-2xs rounded-full bg-surface-container-low text-on-surface-variant">{l[1]}</span>
+                </div>
+                <h3 className="font-headline-sm mt-space-md">{l[2]}</h3>
+                <p className="font-body-sm text-on-surface-variant mt-space-sm">{l[3]}</p>
+                <div className="mt-space-md p-space-sm rounded bg-surface-container-low font-body-sm">
+                  <b className="text-secondary">How we handle it: </b>{l[4]}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-space-2xl p-space-xl bg-surface-container-low rounded-[1.75rem]">
+          <div className="flex items-center gap-space-sm">
+            <ShieldCheck className="text-secondary" size={22} />
+            <h2 className="font-headline-lg">Try it yourself</h2>
+          </div>
+          <p className="font-body-md text-on-surface-variant mt-space-sm max-w-2xl">The clearest proof of this architecture is running it on a real route and reading the explanation on each segment.</p>
+          <Link to="/route-planner" className="btn btn-primary mt-space-lg inline-flex">Open the Safe Route Finder</Link>
+        </section>
+      </div>
+    </div>
+  );
 }

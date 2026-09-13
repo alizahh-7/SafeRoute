@@ -1,3 +1,4 @@
+//frontend/src/assets.config.ts
 export const ASSETS = {
   // 3D Scene Configs
   hero3D: {

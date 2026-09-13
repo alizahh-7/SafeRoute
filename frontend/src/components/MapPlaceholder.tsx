@@ -1,3 +1,4 @@
+//frontend/src/components/MapPlaceholder.tsx
 import { motion } from "framer-motion";
 import type { RouteSegment } from "../types/route";
 import "./MapPlaceholder.css";

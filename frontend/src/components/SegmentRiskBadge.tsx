@@ -1,3 +1,5 @@
+//frontend/src/components/SegmentRiskBadge.tsx
+
 import "./SegmentRiskBadge.css";
 
 interface Props {

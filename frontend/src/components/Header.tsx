@@ -1,3 +1,4 @@
+//frontend/src/components/Header.tsx
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";

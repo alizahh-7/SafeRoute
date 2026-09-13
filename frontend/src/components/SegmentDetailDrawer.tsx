@@ -1,3 +1,4 @@
+//frontend/src/components/SegmentDetailDrawer.tsx
 import { X, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { RouteSegment } from "../types/route";
@@ -89,7 +90,7 @@ const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
                           alt="Road damage" 
                           className="damage-thumbnail" 
                         />
-                        {segment.image_source === "rdd2022_sample" && (
+                        {segment.vision_source === "rdd2022_sample" && (
                           <span className="sample-label">Sample Image</span>
                         )}
                       </div>

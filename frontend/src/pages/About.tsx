@@ -1,3 +1,4 @@
+//frontend/src/pages/About.tsx
 import { useEffect } from "react";
 import { ArrowRight, BrainCircuit, CloudRain, Eye, MapPinned, Route, ShieldCheck, TriangleAlert } from "lucide-react";
 import type { LucideIcon } from "lucide-react";

@@ -1,3 +1,4 @@
+//frontend/src/components/Hero3D.tsx
 import { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Environment, Float, MeshDistortMaterial, RoundedBox } from '@react-three/drei';

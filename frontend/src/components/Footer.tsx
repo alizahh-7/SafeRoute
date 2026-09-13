@@ -1,3 +1,4 @@
+//frontend/src/components/Footer.tsx
 import { Link } from "react-router-dom";
 
 const Footer = () => {

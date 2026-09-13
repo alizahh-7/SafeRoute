@@ -1,3 +1,4 @@
+//frontend/src/components/NewsAdvisoryModal.tsx
 import { motion } from "framer-motion";
 import type { RouteSegment } from "../types/route";
 import "./NewsAdvisoryModal.css";
