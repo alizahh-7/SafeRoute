@@ -165,13 +165,14 @@ export default function RealTimeHazardRerouteAdvisory() {
                   ? "Your vehicle is now moving along the safer alternate route."
                   : "You've arrived on the safer route. This page and Route Results are now in sync."}
             </p>
-            <p className="font-body-sm mt-space-sm"><MapPin size={15} className="inline text-[#B93535]"/> {direct.midpoint.lat.toFixed(4)}, {direct.midpoint.lng.toFixed(4)}</p>
+            <p className="font-body-sm mt-space-sm"><MapPin size={15} className="inline text-[#B93535]"/> {direct.midpoint.lat.toFixed(4)}, {direct.midpoint.lng.toFixed(4)} <span className="text-on-surface-variant">· Source: route geometry</span></p>
           </div>
           {phase === "approaching" && (
             <div className={"rounded-xl bg-[#F9EAEA] p-space-lg min-w-40 " + riskTone}>
               <span className="font-label-caps-micro">RISK SCORE</span>
               <b className="block text-5xl">{direct.final_score}</b>
               <span className="font-body-sm">/100</span>
+              <span className="block mt-space-xs font-label-caps-micro text-on-surface-variant">Source: fused route analysis</span>
               <div className="mt-space-sm font-body-sm text-on-surface">{distanceToHazard} m ahead</div>
             </div>
           )}
@@ -207,14 +208,16 @@ export default function RealTimeHazardRerouteAdvisory() {
               <h2 className="font-headline-md mt-space-xs">{direct.road_name}</h2>
               <p className="font-body-sm text-on-surface-variant mt-space-sm">{direct.explanation}</p>
               <div className="grid grid-cols-2 gap-space-sm mt-space-md font-body-sm">
-                <span><CloudRain size={14} className="inline"/> {direct.waterlogging_flag ? "Waterlogging" : "Drainage clear"}</span>
-                <span><Navigation size={14} className="inline"/> {direct.traffic_level} traffic</span>
+                <span><CloudRain size={14} className="inline"/> {direct.waterlogging_flag ? "Waterlogging" : "Drainage clear"}<small className="block text-on-surface-variant mt-space-2xs">Source: Open-Meteo / drainage signal</small></span>
+                <span><Navigation size={14} className="inline"/> {direct.traffic_level} traffic<small className="block text-on-surface-variant mt-space-2xs">Source: TomTom live traffic</small></span>
               </div>
+              <p className="font-label-caps-micro uppercase text-on-surface-variant mt-space-md">Risk source: IIT Delhi crash data · YOLOv8 · weather · news/dispatch</p>
             </article>
             <article className="rounded-[1.75rem] bg-surface-container-low p-space-lg border-t-4 border-secondary">
               <span className="font-label-caps-micro text-secondary uppercase"><ShieldCheck size={14} className="inline"/> Safer route recommendation</span>
               <h2 className="font-headline-md mt-space-xs">{hasAlternate ? "Backend-scored alternate route" : "Alternate route unavailable"}</h2>
               <p className="font-body-sm text-on-surface-variant mt-space-sm">{hasAlternate ? "Alternate risk: " + alternateData?.alternate_risk + "/100, with " + alternateData?.extra_time_minutes + " additional minute(s)." : "The backend has not found an alternate that meets the safety and time threshold for this route."}</p>
+              {hasAlternate && <p className="font-label-caps-micro uppercase text-on-surface-variant mt-space-xs">Source: backend alternate-route risk scoring</p>}
               <div className="grid grid-cols-2 gap-space-xs mt-space-md font-body-sm">
                 <span><Check size={14} className="inline text-[#2E7D5B]"/> Lower exposure</span>
                 <span><Check size={14} className="inline text-[#2E7D5B]"/> Real route geometry</span>
