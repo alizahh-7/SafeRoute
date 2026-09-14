@@ -1,7 +1,7 @@
 //frontend/src/pages/RouteResults.tsx
 
 import { useEffect, useMemo, useState } from "react";
-import { Navigation, ShieldCheck, AlertTriangle, Zap, Eye, CheckCircle, Pause, Play, Square } from "lucide-react";
+import { Navigation, ShieldCheck, AlertTriangle, Zap, Eye, CheckCircle, Pause, Play, Square, CloudRain } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useRouteContext } from "../context/RouteContext";
 import RouteMap from "../components/RouteMap";
@@ -13,13 +13,50 @@ import type { LatLngTuple } from "leaflet";
 
 const riskColor = (score: number) => score >= 75 ? "#B93535" : score >= 50 ? "#D36128" : score >= 30 ? "#D99B26" : "#2E7D5B";
 
+const LOOKAHEAD_METERS = 250;
+
+function speak(text: string) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 1.4;
+  utterance.pitch = 1;
+  window.speechSynthesis.speak(utterance);
+}
+
+function distanceMeters(a: LatLngTuple, b: LatLngTuple): number {
+  const R = 6371000;
+  const dLat = ((b[0] - a[0]) * Math.PI) / 180;
+  const dLng = ((b[1] - a[1]) * Math.PI) / 180;
+  const lat1 = (a[0] * Math.PI) / 180;
+  const lat2 = (b[0] * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function hazardReasons(segment: RouteSegment): string[] {
+  const reasons: string[] = [];
+  if (segment.waterlogging_flag) reasons.push("waterlogging");
+  if (segment.traffic_level === "high" || segment.traffic_level === "severe") reasons.push(`${segment.traffic_level} traffic`);
+  if (segment.vision_severity === "moderate" || segment.vision_severity === "severe") reasons.push(`${segment.vision_severity} road damage`);
+  if (segment.weather_modifier >= 10) reasons.push("adverse weather");
+  if (segment.news_flags?.length) reasons.push(segment.news_flags[0]);
+  return reasons;
+}
+
+function isHazardWorthy(segment: RouteSegment): boolean {
+  return segment.final_score >= 30 || hazardReasons(segment).length > 0;
+}
+
 const RouteResults = () => {
-  const { routeData, alternateData, origin, destination, loading, error, acceptAlternateRoute } = useRouteContext();
+  const { routeData, alternateData, origin, destination, loading, alternateLoading, error, acceptAlternateRoute } = useRouteContext();
   const [activeSegment, setActiveSegment] = useState<RouteSegment | null>(null);
   const [driveIndex, setDriveIndex] = useState(0);
   const [driving, setDriving] = useState(false);
   const [driveAlert, setDriveAlert] = useState<RouteSegment | null>(null);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [voiceOn, setVoiceOn] = useState(false);
+  const [rerouteProgress, setRerouteProgress] = useState<number | null>(null);
 
   if (loading) return <div className="pt-32 text-center font-body-lg">Analyzing your route with real data...</div>;
   if (error) return <div className="pt-32 text-center font-body-lg text-error">{error}</div>;
@@ -36,7 +73,25 @@ const RouteResults = () => {
   const worstSegment = segments.reduce((worst, s) => !worst || s.final_score > worst.final_score ? s : worst, segments[0]);
   const showAlternate = alternateData?.alternate_available && alternateData.should_suggest_alternate;
   const routePoints = useMemo(() => buildRouteGeometry(segments), [segments]);
+
+  const segmentBoundaries = useMemo(() => {
+  let acc = 0;
+  return segments.map((segment) => {
+    const start = acc;
+    acc += segment.coordinates.length;
+    return { segment, start, end: acc };
+  });
+}, [segments]);
+
   const drivePosition: LatLngTuple | null = routePoints[driveIndex] ?? null;
+
+  useEffect(() => {
+    if (rerouteProgress === null) return;
+    const newIndex = routePoints.length > 1 ? Math.round(rerouteProgress * (routePoints.length - 1)) : 0;
+    setDriveIndex(newIndex);
+    setDriving(true);
+    setRerouteProgress(null);
+  }, [routePoints, rerouteProgress]);
 
   useEffect(() => {
     if (!driving || !routePoints.length) return;
@@ -44,28 +99,64 @@ const RouteResults = () => {
       setDriveIndex((current) => {
         const next = current + 1;
         if (next >= routePoints.length) { setDriving(false); return current; }
-        const approaching = segments.find((segment) =>
-          !dismissedIds.has(segment.segment_id) &&
-          segment.coordinates.some(([lat, lng]) => Math.abs(lat - routePoints[next][0]) < 0.00015 && Math.abs(lng - routePoints[next][1]) < 0.00015)
-          && (segment.final_score >= 50 || segment.waterlogging_flag || Boolean(segment.news_flags?.length))
-        );
+
+        const vehiclePoint = routePoints[next];
+        const currentBoundary = segmentBoundaries.find((b) => next >= b.start && next < b.end);
+        const currentSegmentIndex = currentBoundary ? segmentBoundaries.indexOf(currentBoundary) : 0;
+
+        let approaching: RouteSegment | null = null;
+        for (let i = currentSegmentIndex; i < segmentBoundaries.length; i++) {
+          const { segment } = segmentBoundaries[i];
+          if (dismissedIds.has(segment.segment_id)) continue;
+          if (!isHazardWorthy(segment)) continue;
+
+          const segmentStart = segment.coordinates[0] as LatLngTuple;
+          const distanceAhead = distanceMeters(vehiclePoint, segmentStart);
+
+          if (distanceAhead <= LOOKAHEAD_METERS) {
+            approaching = segment;
+          }
+          break; // nearest upcoming hazard only — further ones are farther away by definition
+        }
+
         if (approaching) {
           setDriveAlert(approaching);
           setDriving(false);
+          if (voiceOn) {
+            const voiceReasons = [
+              approaching.waterlogging_flag ? "waterlogging" : null,
+              approaching.traffic_level === "high" || approaching.traffic_level === "severe" ? `${approaching.traffic_level} traffic` : null,
+              approaching.vision_severity === "moderate" || approaching.vision_severity === "severe" ? "road damage" : null,
+              approaching.weather_modifier >= 10 ? "bad weather" : null,
+              approaching.news_flags?.length ? "a local news alert" : null,
+            ].filter(Boolean).join(", ") || "elevated risk";
+            const altPart = alternateData?.alternate_available
+              ? (showAlternate ? "A safer alternate route is available. Continue, or reroute?" : "No safer alternate found. Recommend continuing.")
+              : "Checking for an alternate route.";
+            speak(`Hazard ahead near ${approaching.road_name}: ${voiceReasons}. ${altPart}`);
+          }
         }
         return next;
       });
     }, 700);
     return () => window.clearInterval(timer);
-  }, [driving, routePoints, segments, dismissedIds]);
+  }, [driving, routePoints, segmentBoundaries, dismissedIds, voiceOn]);
 
-  const stopDrive = () => { setDriving(false); setDriveIndex(0); setDriveAlert(null); setDismissedIds(new Set()); };
+  const stopDrive = () => { setDriving(false); setDriveIndex(0); setDriveAlert(null); setDismissedIds(new Set()); window.speechSynthesis.cancel(); };
   const continueDrive = () => {
+    window.speechSynthesis.cancel();
     if (driveAlert) setDismissedIds((prev) => new Set(prev).add(driveAlert.segment_id));
     setDriveAlert(null);
     setDriving(true);
   };
-  const acceptReroute = () => { if (acceptAlternateRoute()) stopDrive(); };
+  const acceptReroute = () => {
+    window.speechSynthesis.cancel();
+    const progressFraction = routePoints.length > 1 ? driveIndex / (routePoints.length - 1) : 0;
+    if (!acceptAlternateRoute()) return;
+    setDriveAlert(null);
+    setDismissedIds(new Set());
+    setRerouteProgress(progressFraction);
+  };
 
   return (
     <div className="w-full pt-20 bg-background min-h-screen pb-space-3xl">
@@ -116,10 +207,11 @@ const RouteResults = () => {
             <p className="font-body-sm text-on-surface-variant text-center">Route geometry is drawn from the OpenRouteService coordinates returned for this analysis.</p>
             <div className="flex flex-wrap items-center gap-space-sm rounded-xl bg-surface-container-low p-space-md">
               <span className="font-body-sm font-semibold mr-auto">Simulate My Drive</span>
-              <button type="button" onClick={() => setDriving(!driving)} disabled={!routePoints.length} className="btn btn-primary">{driving ? <Pause size={16}/> : <Play size={16}/>} {driving ? "Pause" : driveIndex ? "Resume" : "Start"}</button>
+              <button type="button" onClick={() => setVoiceOn(!voiceOn)} className="btn btn-outline">{voiceOn ? "Voice on" : "Voice off"}</button>
+              <button type="button" onClick={() => setDriving(!driving)} disabled={!routePoints.length || alternateLoading} className="btn btn-primary">{driving ? <Pause size={16}/> : <Play size={16}/>} {alternateLoading ? "Checking routes..." : driving ? "Pause" : driveIndex ? "Resume" : "Start"}</button>
               <button type="button" onClick={stopDrive} className="btn btn-outline"><Square size={15}/> Stop</button>
             </div>
-            {driveAlert && <div className="rounded-xl border border-[#D36128]/30 bg-[#FAEEE8] p-space-md"><div className="flex flex-wrap items-center justify-between gap-space-sm"><div><b>Upcoming: {driveAlert.waterlogging_flag ? "waterlogging" : driveAlert.news_flags?.[0] ?? driveAlert.vision_severity + " surface hazard"} near {driveAlert.road_name}</b><p className="font-body-sm mt-space-2xs">Risk {driveAlert.final_score}/100. Choose whether to continue or use the available safer alternate.</p></div><div className="flex gap-space-xs"><button type="button" className="btn btn-outline" onClick={continueDrive}>Continue</button>{showAlternate && <button type="button" className="btn btn-primary" onClick={acceptReroute}>Accept safer route</button>}</div></div></div>}
+            {driveAlert && <div className="rounded-xl border border-[#D36128]/30 bg-[#FAEEE8] p-space-md"><div className="flex flex-wrap items-center justify-between gap-space-sm"><div><b>Upcoming hazard near {driveAlert.road_name} (~{LOOKAHEAD_METERS}m ahead): {hazardReasons(driveAlert).join(", ") || "elevated risk"}</b><p className="font-body-sm mt-space-2xs">Risk {driveAlert.final_score}/100.</p><p className="font-body-sm mt-space-2xs">{alternateData?.alternate_available ? (showAlternate ? `Safer alternate available: ${alternateData.alternate_risk}/100 risk vs. ${alternateData.primary_risk}/100 here, for ${alternateData.extra_time_minutes} extra minute(s).` : alternateData.recommendation) : "Checking for an alternate route..."}</p></div><div className="flex gap-space-xs"><button type="button" className="btn btn-outline" onClick={continueDrive}>Continue</button>{showAlternate && <button type="button" className="btn btn-primary" onClick={acceptReroute}>Accept safer route</button>}</div></div></div>}
 
             <div className="bg-surface-container-lowest p-space-md rounded-xl flex items-center gap-space-md border border-surface-variant shadow-sm">
               <div className="w-10 h-10 shrink-0 rounded-full bg-secondary-container/20 flex items-center justify-center text-secondary border border-secondary/30">
@@ -147,8 +239,10 @@ const RouteResults = () => {
                 >
                   <div>
                     <div className="font-body-md font-semibold">{seg.road_name}</div>
-                    <div className="font-body-sm text-on-surface-variant mt-space-2xs flex items-center gap-space-xs">
+                    <div className="font-body-sm text-on-surface-variant mt-space-2xs flex items-center gap-space-xs flex-wrap">
                       <Eye size={12} /> {seg.vision_severity} surface · {seg.traffic_level} traffic
+                      {seg.weather_modifier >= 10 ? <><CloudRain size={12} className="text-[#3A7CA5]" /> adverse weather</> : null}
+                      {seg.waterlogging_flag ? <span className="text-[#B93535]">waterlogging</span> : null}
                       {seg.news_flags?.length ? <><AlertTriangle size={12} className="text-[#B93535]" /> news</> : null}
                     </div>
                   </div>

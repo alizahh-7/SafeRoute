@@ -10,6 +10,7 @@ interface RouteContextValue {
   routeData: RouteRiskResponse | null;
   alternateData: AlternateRouteResponse | null;
   loading: boolean;
+  alternateLoading: boolean;
   error: string | null;
   planRoute: (origin: string, destination: string) => Promise<void>;
   acceptAlternateRoute: () => boolean;
@@ -23,6 +24,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   const [routeData, setRouteData] = useState<RouteRiskResponse | null>(null);
   const [alternateData, setAlternateData] = useState<AlternateRouteResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [alternateLoading, setAlternateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const planRoute = useCallback(async (newOrigin: string, newDestination: string) => {
@@ -44,10 +46,14 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     setLoading(false);
 
     // Alternate route fetch runs separately, in the background — a slow/failed
-    // alt-route check shouldn't block the user from seeing their main results.
+    // alt-route check shouldn't block the user from seeing their main results,
+    // but "Simulate My Drive" waits on alternateLoading so a hazard popup never
+    // fires before we know whether a reroute option exists.
+    setAlternateLoading(true);
     fetchAlternateRoute(newOrigin, newDestination)
       .then(setAlternateData)
-      .catch(() => setAlternateData(null));
+      .catch(() => setAlternateData(null))
+      .finally(() => setAlternateLoading(false));
   }, []);
 
   const acceptAlternateRoute = useCallback(() => {
@@ -58,11 +64,21 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     ) / 10;
     setRouteData({ route_total_risk: total, segments: alternateData.alternate_segments });
     setAlternateData(null);
+
+    // The route the user is now driving is the former alternate — re-run the
+    // alternate-route check so hazards on THIS route can also offer a reroute,
+    // instead of leaving them stuck with no reroute option after accepting one.
+    setAlternateLoading(true);
+    fetchAlternateRoute(origin, destination)
+      .then(setAlternateData)
+      .catch(() => setAlternateData(null))
+      .finally(() => setAlternateLoading(false));
+
     return true;
-  }, [alternateData]);
+  }, [alternateData, origin, destination]);
 
   return (
-    <RouteContext.Provider value={{ origin, destination, routeData, alternateData, loading, error, planRoute, acceptAlternateRoute }}>
+    <RouteContext.Provider value={{ origin, destination, routeData, alternateData, loading, alternateLoading, error, planRoute, acceptAlternateRoute }}>
       {children}
     </RouteContext.Provider>
   );

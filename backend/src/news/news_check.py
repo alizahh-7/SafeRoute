@@ -1,3 +1,4 @@
+#backend/src/news/news_check.py
 """
 SafeRoute Telangana — News Module
 
@@ -42,6 +43,13 @@ LOW_URGENCY_KEYWORDS = [
     "review",
 ]
 _news_cache = {}
+_raw_cache = {}
+
+
+def _get_raw_results(road_name):
+    if road_name not in _raw_cache:
+        _raw_cache[road_name] = check_news(road_name)
+    return _raw_cache[road_name]
 
 
 def check_news(road_name, max_results=5):
@@ -73,7 +81,7 @@ def get_news_flags(road_name):
     """
     if road_name in _news_cache:
         return _news_cache[road_name]
-    results = check_news(road_name)
+    results = _get_raw_results(road_name)
     # Use the first meaningful word of the road name to confirm relevance
     # (e.g. "Khairatabad" from "Khairatabad Flyover")
     road_keyword = road_name.split()[0].lower()
@@ -89,6 +97,9 @@ def get_news_flags(road_name):
     return flags
 
 
+REROUTE_THRESHOLD = 0.5  # high-urgency + still-recent news only
+
+
 def get_route_news_advisory(segment_road_names):
     """Convenience wrapper for testing multiple road names/segments at once."""
     advisory = {}
@@ -99,7 +110,7 @@ def get_route_news_advisory(segment_road_names):
 
         advisory[road_name] = flags
 
-        if flags:
+        if news_risk_score(road_name) >= REROUTE_THRESHOLD:
             reroute_flag = True
 
     return {
@@ -156,7 +167,7 @@ def get_news_flags_weighted(road_name):
     not as Umaima's news_flags input unless she approves
     the schema change.
     """
-    results = check_news(road_name)
+    results = _get_raw_results(road_name)
 
     relevant = []
 
@@ -197,4 +208,18 @@ if __name__ == "__main__":
         get_news_flags_weighted(
             "Khairatabad Flyover"
         )
+    )
+    
+    
+URGENCY_WEIGHT = {"high": 1.0, "medium": 0.6, "low": 0.3}
+
+
+def news_risk_score(road_name):
+    """Numeric news risk in [0,1] — for fusion."""
+    weighted = get_news_flags_weighted(road_name)
+    if not weighted:
+        return 0.0
+    return max(
+        URGENCY_WEIGHT.get(item["urgency"], 0.3) * item["recency_weight"]
+        for item in weighted
     )

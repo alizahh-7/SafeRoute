@@ -12,7 +12,7 @@ from src.data_pipeline.segmentation import segment_route
 from src.risk_engine.historical_score import load_black_spots, load_crash_data, score_all_segments
 from src.risk_engine.time_pattern import build_daily_risk_profile, apply_time_modifier
 from src.risk_engine.fusion import fuse_all_segments, route_total_risk
-from src.news.news_check import get_news_flags
+from src.news.news_check import get_news_flags, news_risk_score
 from src.vision.detect import load_model
 from src.vision.vision_pipeline import get_segment_vision_severity_multi
 from src.live_signals.weather import get_weather_modifier
@@ -36,6 +36,7 @@ def apply_real_vision_and_news(segment: dict, vision_model) -> dict:
     segment["vision_source"] = source
     segment["image_url"] = image_url
     segment["news_flags"] = get_news_flags(segment["road_name"])
+    segment["news_risk_score"] = news_risk_score(segment["road_name"])
     return segment
 
 

@@ -34,6 +34,7 @@ export interface RouteRiskResponse {
 export interface AlternateRouteResponse {
   alternate_available: boolean;
   reason?: string;
+  recommendation?: string;
   should_suggest_alternate?: boolean;
   primary_risk?: number;
   alternate_risk?: number;

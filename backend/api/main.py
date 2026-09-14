@@ -15,7 +15,7 @@ from main import run_pipeline
 from src.risk_engine.fusion import route_total_risk
 from src.routing.alt_route import suggest_safer_route
 from src.api_clients.geocode import geocode, get_location_suggestions, reverse_geocode
-from src.news.news_check import get_news_flags
+from src.news.news_check import get_news_flags, get_route_news_advisory
 
 app = FastAPI()
 FALLBACK_IMAGE_DIR = Path(__file__).resolve().parents[1] / "data" / "india_subset" / "test" / "images"
@@ -45,9 +45,14 @@ def get_route_risk(req: RouteRequest, request: Request):
         if segment.get("vision_source") == "rdd2022_sample" and segment.get("image_url"):
             filename = quote(Path(segment["image_url"]).name)
             segment["image_url"] = f"{request.base_url}vision-fallback/{filename}"
+
+    road_names = [s["road_name"] for s in segments]
+    news_advisory = get_route_news_advisory(road_names)
+
     return {
         "route_total_risk": route_total_risk(segments),
         "segments": segments,
+        "should_prompt_reroute": news_advisory["should_prompt_reroute"],
     }
     
 @app.post("/alternate-route")

@@ -11,8 +11,8 @@ from main import score_route
 from src.live_signals.waterlogging import load_waterlogging_points
 from src.vision.detect import load_model
 
-RISK_IMPROVEMENT_THRESHOLD = 0.15   # alt must be 15%+ safer to be worth suggesting
-MAX_ACCEPTABLE_TIME_INCREASE = 0.20  # won't suggest a route more than 20% slower
+RISK_IMPROVEMENT_THRESHOLD = 0.01   # alt must be 15%+ safer to be worth suggesting
+MAX_ACCEPTABLE_TIME_INCREASE = 1.0  # won't suggest a route more than 20% slower
 
 
 def suggest_safer_route(origin_name: str, destination_name: str) -> dict:
@@ -27,10 +27,12 @@ def suggest_safer_route(origin_name: str, destination_name: str) -> dict:
     vision_model = load_model("src/vision/best.pt")
 
     scored_routes = []
-    for route in routes:
+    for i, route in enumerate(routes):
         segments = score_route(route["coordinates"], waterlogging_points, vision_model)
+        risk = route_total_risk(segments)
+        print(f"DEBUG route[{i}]: risk={risk} duration={route['duration_sec']/60:.1f}min")
         scored_routes.append({
-            "risk": route_total_risk(segments),
+            "risk": risk,
             "duration_sec": route["duration_sec"],
             "segments": segments,
         })
@@ -40,14 +42,24 @@ def suggest_safer_route(origin_name: str, destination_name: str) -> dict:
     risk_improvement = (primary["risk"] - alternate["risk"]) / primary["risk"] if primary["risk"] else 0
     time_increase = (alternate["duration_sec"] - primary["duration_sec"]) / primary["duration_sec"]
 
+    #temporary testing
+    print(f"DEBUG primary_risk={primary['risk']} alt_risk={alternate['risk']} "
+          f"risk_improvement={risk_improvement:.2f} time_increase={time_increase:.2f}")
     should_suggest = risk_improvement >= RISK_IMPROVEMENT_THRESHOLD and time_increase <= MAX_ACCEPTABLE_TIME_INCREASE
+
+    recommendation = (
+        "A safer alternate route is available."
+        if should_suggest
+        else "The alternate route is not meaningfully safer — recommended to continue on the current route."
+    )
 
     return {
         "alternate_available": True,
         "should_suggest_alternate": should_suggest,
+        "recommendation": recommendation,
         "primary_risk": primary["risk"],
         "alternate_risk": alternate["risk"],
         "extra_time_minutes": round((alternate["duration_sec"] - primary["duration_sec"]) / 60, 1),
         "primary_segments": primary["segments"],
-        "alternate_segments": alternate["segments"] if should_suggest else None,
+        "alternate_segments": alternate["segments"],
     }

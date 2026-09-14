@@ -8,7 +8,7 @@ from src.risk_engine.explain import generate_explanation
 TRAFFIC_POINTS = {"low": 0, "medium": 5, "high": 12, "severe": 20}
 VISION_POINTS = {"none": 0, "minor": 5, "moderate": 12, "severe": 22}
 WATERLOGGING_POINTS = 15
-NEWS_POINTS = 8
+NEWS_POINTS_MAX = 15
 
 
 def fuse_segment_risk(segment: dict) -> dict:
@@ -17,7 +17,7 @@ def fuse_segment_risk(segment: dict) -> dict:
     traffic_add = TRAFFIC_POINTS.get(segment.get("traffic_level"), 0)
     waterlogging_add = WATERLOGGING_POINTS if segment.get("waterlogging_flag") else 0
     vision_add = VISION_POINTS.get(segment.get("vision_severity"), 0)
-    news_add = NEWS_POINTS if segment.get("news_flags") else 0
+    news_add = round(NEWS_POINTS_MAX * (segment.get("news_risk_score") or 0.0), 1)
 
     total = base + weather_add + traffic_add + waterlogging_add + vision_add + news_add
     segment["final_score"] = round(min(total, 100.0), 1)

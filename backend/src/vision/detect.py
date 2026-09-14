@@ -35,14 +35,20 @@ def load_model(weights_path="best.pt"):
 
 def download_image(url):
     """
-    Downloads an image from a URL and returns a PIL Image.
+    Downloads an image from a URL and returns a PIL Image, or None if
+    the download fails (timeout, connection error, bad content, etc.).
 
     Needed because Ultralytics can misread complex query-string URLs
     (e.g. Mapillary photo URLs) as a video stream instead of a still
     image, causing it to hang.
     """
-    response = requests.get(url, timeout=10)
-    return Image.open(BytesIO(response.content))
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        return Image.open(BytesIO(response.content))
+    except (requests.exceptions.RequestException, OSError) as e:
+        print(f"WARNING: vision image download failed for {url}: {e}")
+        return None
 
 
 def detect_damage(model, image_path_or_url, conf=0.25):
@@ -65,6 +71,9 @@ def detect_damage(model, image_path_or_url, conf=0.25):
         image = download_image(image_path_or_url)
     else:
         image = image_path_or_url
+
+    if image is None:
+        return []
 
     results = model.predict(image, conf=conf, verbose=False)
 
