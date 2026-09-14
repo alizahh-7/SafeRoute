@@ -1,6 +1,7 @@
 //frontend/src/pages/RouteResults.tsx
 
 import { useEffect, useMemo, useState } from "react";
+import { jsPDF } from "jspdf";
 import { Navigation, ShieldCheck, AlertTriangle, Zap, Eye, CheckCircle, Pause, Play, Square, CloudRain } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useRouteContext } from "../context/RouteContext";
@@ -157,6 +158,77 @@ const RouteResults = () => {
     setDismissedIds(new Set());
     setRerouteProgress(progressFraction);
   };
+  
+  const downloadSafetyReport = () => {
+    const report = new jsPDF({ orientation: "landscape", unit: "mm", format: "a3" });
+    const pageWidth = report.internal.pageSize.getWidth();
+    const pageHeight = report.internal.pageSize.getHeight();
+    const margin = 12;
+    const truncate = (value: string, maxLength: number) => value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
+    const flagStatus = (segment: RouteSegment) => [
+      segment.waterlogging_flag ? "Waterlogging" : "",
+      ...(segment.news_flags ?? []).length ? "News" : "",
+    ].filter(Boolean).join(", ") || "None";
+
+    report.setTextColor(26, 26, 24);
+    report.setFont("helvetica", "bold");
+    report.setFontSize(20);
+    report.text("SafeRoute Telangana — Safety Report", margin, 18);
+    report.setFont("helvetica", "normal");
+    report.setFontSize(9);
+    report.text(`Route: ${origin} → ${destination}`, margin, 26);
+    report.text(`Overall risk: ${route_total_risk}/100     Generated: ${new Date().toLocaleString()}`, margin, 32);
+
+    report.setFillColor(248, 244, 232);
+    report.roundedRect(margin, 38, pageWidth - margin * 2, 22, 2, 2, "F");
+    report.setFont("helvetica", "bold");
+    report.setFontSize(9);
+    report.text(`Highest-risk segment: ${worstSegment.road_name} (${worstSegment.final_score}/100)`, margin + 5, 45);
+    report.setFont("helvetica", "normal");
+    report.setFontSize(7.5);
+    
+    const explanation = report.splitTextToSize(worstSegment.explanation, pageWidth - margin * 2 - 10);
+    report.text(explanation.slice(0, 2), margin + 5, 51);
+
+    const tableTop = 68;
+    const footerTop = pageHeight - 11;
+    const rowHeight = Math.max(3.2, Math.min(6, (footerTop - tableTop - 8) / Math.max(segments.length, 1)));
+    const columns = [
+      { title: "Road name", x: margin, width: 124 },
+      { title: "Risk", x: margin + 124, width: 26 },
+      { title: "Vision severity", x: margin + 150, width: 48 },
+      { title: "Traffic level", x: margin + 198, width: 42 },
+      { title: "Active flag", x: margin + 240, width: pageWidth - margin - (margin + 240) },
+    ];
+    report.setFillColor(212, 162, 52);
+    report.rect(margin, tableTop, pageWidth - margin * 2, 7, "F");
+    report.setTextColor(26, 26, 24);
+    report.setFont("helvetica", "bold");
+    report.setFontSize(7.5);
+    columns.forEach(({ title, x }) => report.text(title, x + 2, tableTop + 4.6));
+
+    report.setFont("helvetica", "normal");
+    report.setFontSize(Math.max(5.5, Math.min(7.5, rowHeight + 1.2)));
+    segments.forEach((segment, index) => {
+      const y = tableTop + 7 + rowHeight * index;
+      if (index % 2 === 0) {
+        report.setFillColor(250, 248, 245);
+        report.rect(margin, y, pageWidth - margin * 2, rowHeight, "F");
+      }
+      const baseline = y + rowHeight * 0.68;
+      report.setTextColor(26, 26, 24);
+      report.text(truncate(segment.road_name, 58), columns[0].x + 2, baseline);
+      report.text(`${segment.final_score}/100`, columns[1].x + 2, baseline);
+      report.text(segment.vision_severity, columns[2].x + 2, baseline);
+      report.text(segment.traffic_level, columns[3].x + 2, baseline);
+      report.text(truncate(flagStatus(segment), 42), columns[4].x + 2, baseline);
+    });
+
+    report.setTextColor(90, 90, 84);
+    report.setFontSize(7);
+    report.text("Data sources: IIT Delhi Telangana crash dataset, Open-Meteo, TomTom, YOLOv8 road-surface detection, Google News RSS", margin, pageHeight - 6);
+    report.save("SafeRoute-Telangana-Safety-Report.pdf");
+  };
 
   return (
     <div className="w-full pt-20 bg-background min-h-screen pb-space-3xl">
@@ -170,6 +242,7 @@ const RouteResults = () => {
           <div className="text-right">
             <div className="font-display-hero text-display-hero font-semibold leading-none" style={{ color: primaryColor }}>{route_total_risk}</div>
             <div className="font-label-caps-micro text-label-caps-micro font-bold text-on-surface-variant uppercase mt-space-2xs">Overall risk / 100</div>
+            <div className="font-label-caps-micro text-label-caps-micro text-on-surface-variant mt-space-2xs">Source: fused route analysis</div>
           </div>
         </div>
 
@@ -177,8 +250,12 @@ const RouteResults = () => {
           <div>
             <p className="font-body-md"><b>Riskiest point on this route:</b> {worstSegment.road_name} ({worstSegment.final_score}/100)</p>
             <p className="font-body-sm text-on-surface-variant mt-space-2xs">{worstSegment.explanation}</p>
+            <p className="font-label-caps-micro text-label-caps-micro uppercase text-on-surface-variant mt-space-xs">Source: segment-level multi-factor risk fusion</p>
           </div>
-          <button onClick={() => setActiveSegment(worstSegment)} className="btn btn-outline shrink-0">Inspect this segment</button>
+          <div className="flex flex-wrap gap-space-xs shrink-0">
+            <button type="button" onClick={downloadSafetyReport} className="btn btn-primary">Download Safety Report</button>
+            <button type="button" onClick={() => setActiveSegment(worstSegment)} className="btn btn-outline">Inspect this segment</button>
+          </div>
         </div>
 
         {alternateData?.alternate_available && (
@@ -220,6 +297,7 @@ const RouteResults = () => {
               <div>
                 <div className="font-headline-sm font-semibold">{segments.length} segments · {hazardCount} with an active hazard signal</div>
                 <div className="font-body-sm text-on-surface-variant">Historical crash data, live weather, live traffic, waterlogging fusion, road-surface vision, and local news — click any segment for the full breakdown.</div>
+                <div className="font-label-caps-micro text-label-caps-micro uppercase text-on-surface-variant mt-space-2xs">Sources: IIT Delhi · Open-Meteo · TomTom · YOLOv8 · Google News RSS</div>
               </div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 //frontend/src/context/RouteContext.tsx
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { fetchRoute, fetchAlternateRoute, ApiError } from "../services/api";
 import type { RouteRiskResponse, AlternateRouteResponse } from "../types/route";
 
@@ -12,8 +12,34 @@ interface RouteContextValue {
   loading: boolean;
   alternateLoading: boolean;
   error: string | null;
+  routesAnalyzed: number;
+  hazardsFlagged: number;
+  reroutesAccepted: number;
   planRoute: (origin: string, destination: string) => Promise<void>;
   acceptAlternateRoute: () => boolean;
+}
+
+const SESSION_STATS_KEY = "saferoute-session-stats";
+
+type SessionStats = {
+  routesAnalyzed: number;
+  hazardsFlagged: number;
+  reroutesAccepted: number;
+};
+
+function getPersistedSessionStats(): SessionStats {
+  try {
+    const saved = localStorage.getItem(SESSION_STATS_KEY);
+    if (!saved) return { routesAnalyzed: 0, hazardsFlagged: 0, reroutesAccepted: 0 };
+    const parsed = JSON.parse(saved);
+    return {
+      routesAnalyzed: Number.isFinite(parsed.routesAnalyzed) ? parsed.routesAnalyzed : 0,
+      hazardsFlagged: Number.isFinite(parsed.hazardsFlagged) ? parsed.hazardsFlagged : 0,
+      reroutesAccepted: Number.isFinite(parsed.reroutesAccepted) ? parsed.reroutesAccepted : 0,
+    };
+  } catch {
+    return { routesAnalyzed: 0, hazardsFlagged: 0, reroutesAccepted: 0 };
+  }
 }
 
 const RouteContext = createContext<RouteContextValue | undefined>(undefined);
@@ -26,6 +52,13 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [alternateLoading, setAlternateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [routesAnalyzed, setRoutesAnalyzed] = useState(() => getPersistedSessionStats().routesAnalyzed);
+  const [hazardsFlagged, setHazardsFlagged] = useState(() => getPersistedSessionStats().hazardsFlagged);
+  const [reroutesAccepted, setReroutesAccepted] = useState(() => getPersistedSessionStats().reroutesAccepted);
+
+  useEffect(() => {
+    localStorage.setItem(SESSION_STATS_KEY, JSON.stringify({ routesAnalyzed, hazardsFlagged, reroutesAccepted }));
+  }, [routesAnalyzed, hazardsFlagged, reroutesAccepted]);
 
   const planRoute = useCallback(async (newOrigin: string, newDestination: string) => {
     setLoading(true);
@@ -37,6 +70,10 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     try {
       const result = await fetchRoute(newOrigin, newDestination);
       setRouteData(result);
+      setRoutesAnalyzed((count) => count + 1);
+      setHazardsFlagged((count) => count + result.segments.filter((segment) => (
+        segment.final_score >= 50 || Boolean(segment.waterlogging_flag) || Boolean(segment.news_flags?.length)
+      )).length);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not fetch route. Is the backend running?");
       setRouteData(null);
@@ -74,12 +111,12 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       .catch(() => setAlternateData(null))
       .finally(() => setAlternateLoading(false));
 
+    setReroutesAccepted((count) => count + 1);
     return true;
   }, [alternateData, origin, destination]);
 
   return (
-    <RouteContext.Provider value={{ origin, destination, routeData, alternateData, loading, alternateLoading, error, planRoute, acceptAlternateRoute }}>
-      {children}
+    <RouteContext.Provider value={{ origin, destination, routeData, alternateData, loading, alternateLoading, error, routesAnalyzed, hazardsFlagged, reroutesAccepted, planRoute, acceptAlternateRoute }}>      {children}
     </RouteContext.Provider>
   );
 }

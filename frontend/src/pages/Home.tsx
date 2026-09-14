@@ -1,5 +1,6 @@
 //frontend/src/pages/Home.tsx
 import { Link } from "react-router-dom";
+import SessionStatsBar from "../components/SessionStatsBar";
 
 const Home = () => {
   return (
@@ -68,6 +69,8 @@ const Home = () => {
                     <span className="font-body-sm text-body-sm text-on-surface-variant">Avg Safe Shift</span>
                   </div>
                 </div>
+
+                <SessionStatsBar />
               </div>
 
               {/* Hero Visual Showcase Card: Gachibowli to Secunderabad Route Comparison */}

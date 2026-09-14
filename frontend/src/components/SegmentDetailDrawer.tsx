@@ -49,16 +49,19 @@ const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
                 
                 <div className="stat-number text-center mb-2">{segment.final_score}</div>
                 <p className="text-center text-dark-grey">{segment.explanation}</p>
+                <p className="text-center text-muted mt-2" style={{ fontSize: '0.75rem' }}>Source: fused route risk pipeline</p>
                 
                 <div className="risk-breakdown mt-6">
                   <div className="breakdown-item">
                     <span className="label">Historical Data</span>
+                    <span className="text-muted" style={{ fontSize: '0.7rem' }}>Source: IIT Delhi crash dataset</span>
                     <div className="bar-bg">
                       <motion.div className="bar-fill" initial={{ width: 0 }} animate={{ width: `${segment.historical_score}%` }} transition={{ duration: 1, delay: 0.2 }} />
                     </div>
                   </div>
                   <div className="breakdown-item">
                     <span className="label">Traffic ({segment.traffic_level})</span>
+                    <span className="text-muted" style={{ fontSize: '0.7rem' }}>Source: TomTom live traffic</span>
                     <div className="bar-bg">
                       <motion.div className="bar-fill" initial={{ width: 0 }} animate={{ width: segment.traffic_level === 'severe' ? '90%' : segment.traffic_level === 'high' ? '70%' : '30%' }} transition={{ duration: 1, delay: 0.3 }} />
                     </div>
@@ -66,6 +69,7 @@ const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
                   {segment.waterlogging_flag && (
                     <div className="breakdown-item">
                       <span className="label">Waterlogging</span>
+                      <span className="text-muted" style={{ fontSize: '0.7rem' }}>Source: Open-Meteo / municipal drainage signal</span>
                       <div className="bar-bg">
                         <motion.div className="bar-fill" style={{ backgroundColor: 'var(--risk-high)' }} initial={{ width: 0 }} animate={{ width: '80%' }} transition={{ duration: 1, delay: 0.4 }} />
                       </div>
@@ -94,6 +98,7 @@ const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
                     <div>
                       <span className="pill risk-severe size-sm mb-2">Severity: {segment.vision_severity}</span>
                       <p className="text-sm text-dark-grey">YOLOv8 detected surface anomalies on this route segment.</p>
+                      <p className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>Source: {segment.vision_source === "rdd2022_sample" ? "YOLOv8 / RDD2022 fallback" : "YOLOv8 street-level vision"}</p>
                     </div>
                   </div>
                 </div>
@@ -102,6 +107,7 @@ const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
               {segment.news_flags && segment.news_flags.length > 0 && (
                 <div className="card mt-4 news-card">
                   <h4 className="mb-2">Live News Reports</h4>
+                  <p className="text-muted mb-2" style={{ fontSize: '0.75rem' }}>Source: Google News RSS</p>
                   <ul className="news-list">
                     {segment.news_flags.map((news, i) => (
                       <motion.li 
