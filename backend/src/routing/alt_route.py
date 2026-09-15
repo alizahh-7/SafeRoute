@@ -7,7 +7,7 @@ one if it's meaningfully lower-risk without a huge time cost.
 from src.api_clients.geocode import geocode
 from src.api_clients.maps_routing import get_alternative_routes
 from src.risk_engine.fusion import route_total_risk
-from main import score_route
+from main import score_route, score_route_quick, route_quick_risk
 from src.live_signals.waterlogging import load_waterlogging_points
 from src.vision.detect import load_model
 
@@ -23,28 +23,36 @@ def suggest_safer_route(origin_name: str, destination_name: str) -> dict:
     if len(routes) < 2:
         return {"alternate_available": False, "reason": "No alternate route found for this trip."}
 
+    # Fast pass: rank every candidate using historical crash data + time-of-day
+    # only (no weather/traffic/vision/news calls) — cheap enough to run on all
+    # candidates so we know which ONE alternate is worth fully scoring.
+    quick_scored = []
+    for i, route in enumerate(routes):
+        segments = score_route_quick(route["coordinates"])
+        risk = route_quick_risk(segments)
+        print(f"DEBUG quick route[{i}]: risk={risk} duration={route['duration_sec']/60:.1f}min")
+        quick_scored.append({"risk": risk, "route": route})
+
+    best_alt_quick = min(quick_scored[1:], key=lambda r: r["risk"])
+
+    # Full pass: only the primary and the ONE best-looking alternate get the
+    # slow, live-signal pipeline (weather/traffic/vision/news) — not every
+    # candidate ORS handed back.
     waterlogging_points = load_waterlogging_points()
     vision_model = load_model("src/vision/best.pt")
 
-    scored_routes = []
-    for i, route in enumerate(routes):
-        segments = score_route(route["coordinates"], waterlogging_points, vision_model)
-        risk = route_total_risk(segments)
-        print(f"DEBUG route[{i}]: risk={risk} duration={route['duration_sec']/60:.1f}min")
-        scored_routes.append({
-            "risk": risk,
-            "duration_sec": route["duration_sec"],
-            "segments": segments,
-        })
+    primary_segments = score_route(routes[0]["coordinates"], waterlogging_points, vision_model)
+    alternate_segments = score_route(best_alt_quick["route"]["coordinates"], waterlogging_points, vision_model)
 
-    primary, alternate = scored_routes[0], min(scored_routes[1:], key=lambda r: r["risk"])
+    primary_risk = route_total_risk(primary_segments)
+    alternate_risk = route_total_risk(alternate_segments)
 
-    risk_improvement = (primary["risk"] - alternate["risk"]) / primary["risk"] if primary["risk"] else 0
-    time_increase = (alternate["duration_sec"] - primary["duration_sec"]) / primary["duration_sec"]
+    risk_improvement = (primary_risk - alternate_risk) / primary_risk if primary_risk else 0
+    time_increase = (best_alt_quick["route"]["duration_sec"] - routes[0]["duration_sec"]) / routes[0]["duration_sec"]
 
-    #temporary testing
-    print(f"DEBUG primary_risk={primary['risk']} alt_risk={alternate['risk']} "
+    print(f"DEBUG primary_risk={primary_risk} alt_risk={alternate_risk} "
           f"risk_improvement={risk_improvement:.2f} time_increase={time_increase:.2f}")
+
     should_suggest = risk_improvement >= RISK_IMPROVEMENT_THRESHOLD and time_increase <= MAX_ACCEPTABLE_TIME_INCREASE
 
     recommendation = (
@@ -57,9 +65,8 @@ def suggest_safer_route(origin_name: str, destination_name: str) -> dict:
         "alternate_available": True,
         "should_suggest_alternate": should_suggest,
         "recommendation": recommendation,
-        "primary_risk": primary["risk"],
-        "alternate_risk": alternate["risk"],
-        "extra_time_minutes": round((alternate["duration_sec"] - primary["duration_sec"]) / 60, 1),
-        "primary_segments": primary["segments"],
-        "alternate_segments": alternate["segments"],
+        "primary_risk": primary_risk,
+        "alternate_risk": alternate_risk,
+        "extra_time_minutes": round((best_alt_quick["route"]["duration_sec"] - routes[0]["duration_sec"]) / 60, 1),
+        "alternate_segments": alternate_segments,
     }

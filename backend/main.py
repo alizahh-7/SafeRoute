@@ -4,6 +4,7 @@ main.py
 Owner: Umaima (integration owner)
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from src.api_clients.geocode import geocode, reverse_geocode
@@ -54,10 +55,42 @@ def score_route(route_coordinates, waterlogging_points, vision_model):
     current_day = datetime.now().strftime("%A")
     segments = [apply_time_modifier(s, current_day, daily_profile) for s in segments]
 
-    segments = [apply_real_weather_and_traffic(s, waterlogging_points) for s in segments]
-    segments = [apply_real_vision_and_news(s, vision_model) for s in segments]
+    # These are all independent per-segment network/model calls — run them
+    # concurrently instead of one segment at a time. This is the main fix
+    # for slow alternate-route checks.
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        segments = list(executor.map(lambda s: apply_real_weather_and_traffic(s, waterlogging_points), segments))
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        segments = list(executor.map(lambda s: apply_real_vision_and_news(s, vision_model), segments))
 
     return fuse_all_segments(segments)
+
+
+def score_route_quick(route_coordinates):
+    """Lightweight version of score_route — historical crash data + time-of-day
+    pattern ONLY. No weather/traffic/vision/news network calls. Used to compare
+    multiple candidate routes fast, before fully enriching just the winner."""
+    segments = segment_route(route_coordinates, segment_length_m=500)
+    for seg in segments:
+        seg["road_name"] = reverse_geocode(seg["midpoint"]["lat"], seg["midpoint"]["lng"])
+
+    black_spots = load_black_spots()
+    crashes = load_crash_data()
+    segments = score_all_segments(segments, black_spots, crashes)
+
+    daily_profile = build_daily_risk_profile(crashes)
+    current_day = datetime.now().strftime("%A")
+    segments = [apply_time_modifier(s, current_day, daily_profile) for s in segments]
+
+    for s in segments:
+        s["quick_risk"] = (s.get("historical_score") or 0) + (s.get("time_pattern_modifier") or 0)
+
+    return segments
+
+
+def route_quick_risk(segments):
+    scores = [s["quick_risk"] for s in segments]
+    return round(sum(scores) / len(scores), 1) if scores else 0.0
 
 
 def run_pipeline(origin_name: str, destination_name: str):
