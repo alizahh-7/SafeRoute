@@ -18,11 +18,19 @@ export const buildRouteGeometry = (segments: RouteSegment[]): LatLngTuple[] =>
   );
 
 function SegmentPopup({ segment, onSelect }: { segment: RouteSegment; onSelect?: (segment: RouteSegment) => void }) {
-  const weather = segment.weather_modifier >= 20 ? "Severe weather modifier" : segment.weather_modifier >= 10 ? "Weather caution active" : "No weather modifier";
+  const weather = segment.weather_status === "unavailable"
+    ? "Weather feed unavailable"
+    : segment.weather_modifier >= 20 ? "Live weather: severe caution"
+      : segment.weather_modifier >= 10 ? "Live weather: caution active"
+        : `Live weather: clear · no score lift${segment.weather_precipitation_mm !== undefined ? ` (${segment.weather_precipitation_mm} mm/h)` : ""}`;
+  const traffic = segment.traffic_status === "unavailable" || segment.traffic_level === "unavailable"
+    ? "Traffic feed unavailable"
+    : `Live traffic: ${segment.traffic_level}${segment.traffic_current_speed_kmh !== undefined ? ` (${segment.traffic_current_speed_kmh} km/h)` : ""}`;
   const hazard = segment.waterlogging_flag ? "Waterlogging flag" : segment.news_flags?.[0] ?? "No incident headline";
   return <div className="min-w-52 max-w-64 space-y-2 py-1">
     <div className="flex items-center justify-between gap-3"><b>{segment.road_name}</b><span style={{ color: riskColor(segment.final_score) }}>{segment.final_score}/100</span></div>
-    <p className="m-0 text-xs">{weather} · {segment.traffic_level} traffic</p>
+    <p className="m-0 text-xs">{weather}</p>
+    <p className="m-0 text-xs">{traffic}</p>
     <p className="m-0 text-xs"><b>Surface:</b> {segment.vision_severity}</p>
     <p className="m-0 text-xs"><b>Advisory:</b> {hazard}</p>
     {segment.image_url && <img src={segment.image_url} alt={"Road surface at " + segment.road_name} className="max-h-28 w-full rounded object-contain bg-[#f1efe9]" />}

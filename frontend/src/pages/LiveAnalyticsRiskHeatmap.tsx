@@ -6,11 +6,20 @@ import { useRouteContext } from "../context/RouteContext";
 
 const shell = "w-full max-w-[1440px] mx-auto px-layout-margin-mobile md:px-layout-margin-tablet lg:px-layout-margin-desktop";
 const color = (score: number) => score >= 75 ? "#B93535" : score >= 50 ? "#D36128" : score >= 30 ? "#D99B26" : "#2E7D5B";
+const dominantFactor = (item: { historical_score: number; weather_modifier: number; traffic_level: string; waterlogging_flag: boolean; vision_severity: string; news_flags: string[] | null }) => {
+  const candidates = [
+    ["historical crash pattern", item.historical_score], ["live weather", item.weather_modifier], ["live traffic", item.traffic_level === "severe" ? 20 : item.traffic_level === "high" ? 12 : item.traffic_level === "medium" ? 5 : 0],
+    ["inundation proximity", item.waterlogging_flag ? 15 : 0], ["road-surface vision", item.vision_severity === "severe" ? 22 : item.vision_severity === "moderate" ? 12 : item.vision_severity === "minor" ? 5 : 0], ["news advisory", item.news_flags?.length ? 15 : 0],
+  ] as const;
+  return candidates.reduce((highest, candidate) => candidate[1] > highest[1] ? candidate : highest)[0];
+};
 
 export default function LiveAnalyticsRiskHeatmap() {
   const { routeData } = useRouteContext();
   const segments = routeData?.segments ?? [];
   const [filter, setFilter] = useState<"all" | "hazards" | "surface">("all");
+  const [activeTrajectoryIndex, setActiveTrajectoryIndex] = useState(0);
+  const [selectedBucket, setSelectedBucket] = useState("All");
 
   useEffect(() => {
     document.title = "LIVE ANALYTICS & RISK HEATMAP | SafeRoute Telangana";
@@ -31,20 +40,33 @@ export default function LiveAnalyticsRiskHeatmap() {
     : 0;
 
   const signals = segments.filter(item => item.waterlogging_flag || item.news_flags?.length).length;
+  const affectedSegments = segments.filter(item => item.final_score >= 50 || item.waterlogging_flag || item.news_flags?.length).length;
+  const highestRisk = segments.reduce<typeof segments[number] | null>((highest, item) => !highest || item.final_score > highest.final_score ? item : highest, null);
+  const routeDelta = segments.length > 1 ? Math.round((segments[segments.length - 1].final_score - segments[0].final_score) * 10) / 10 : 0;
 
-  const hourlyRisk = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, index) => {
-        const hour = index * 2;
-        const commuterLift = hour >= 16 && hour <= 20 ? 18 : hour >= 6 && hour <= 10 ? 10 : 0;
-        const weatherLift = segments.filter(item => item.waterlogging_flag).length * 4;
-        return {
-          hour,
-          score: Math.min(100, Math.max(8, average + commuterLift + weatherLift - Math.abs(12 - hour))),
-        };
-      }),
-    [average, segments]
-  );
+  const trajectory = useMemo(() => segments.map((item, index) => ({
+    ...item,
+    index,
+    weatherActive: item.weather_modifier > 0,
+    trafficActive: item.traffic_level === "medium" || item.traffic_level === "high" || item.traffic_level === "severe",
+  })), [segments]);
+  const activeTrajectory = trajectory[activeTrajectoryIndex] ?? trajectory[0];
+  const detectionEvents = useMemo(() => segments.flatMap((item) => {
+    const events: { segment: typeof item; kind: string; detail: string }[] = [];
+    if (item.vision_severity !== "none") events.push({ segment: item, kind: "Vision", detail: `${item.vision_severity} surface assessment` });
+    if (item.waterlogging_flag) events.push({ segment: item, kind: "Inundation", detail: "Waterlogging proximity signal" });
+    if (item.weather_modifier > 0) events.push({ segment: item, kind: "Weather", detail: `Live weather adds ${item.weather_modifier} risk points` });
+    if (item.traffic_level === "medium" || item.traffic_level === "high" || item.traffic_level === "severe") events.push({ segment: item, kind: "Traffic", detail: `${item.traffic_level} live congestion` });
+    (item.news_flags ?? []).forEach((headline) => events.push({ segment: item, kind: "News", detail: headline }));
+    return events;
+  }), [segments]);
+  const riskBuckets = useMemo(() => [
+    { label: "Low", range: "0–29", tint: "#2E7D5B", items: segments.filter(item => item.final_score < 30) },
+    { label: "Moderate", range: "30–49", tint: "#D99B26", items: segments.filter(item => item.final_score >= 30 && item.final_score < 50) },
+    { label: "High", range: "50–74", tint: "#D36128", items: segments.filter(item => item.final_score >= 50 && item.final_score < 75) },
+    { label: "Severe", range: "75–100", tint: "#B93535", items: segments.filter(item => item.final_score >= 75) },
+  ], [segments]);
+  const selectedBucketItems = selectedBucket === "All" ? segments : riskBuckets.find(bucket => bucket.label === selectedBucket)?.items ?? [];
 
   return (
     <div className="pt-20 pb-space-3xl min-h-screen bg-background">
@@ -104,26 +126,13 @@ export default function LiveAnalyticsRiskHeatmap() {
             <span className="font-label-caps-micro uppercase text-secondary">Risk distribution</span>
             <h2 className="font-headline-md mt-space-xs">Score profile</h2>
 
-            <div className="mt-space-lg flex items-end gap-space-sm h-52">
-              {segments.map(item => (
-                <Link key={item.segment_id} to={`/segment/${item.segment_id}`} className="flex-1 h-full flex flex-col justify-end group">
-                  <span className="text-center font-label-caps-micro mb-space-xs opacity-0 group-hover:opacity-100">
-                    {item.final_score}
-                  </span>
-                  <span
-                    className="rounded-t-md min-h-2 transition-opacity group-hover:opacity-70"
-                    style={{ height: `${Math.max(8, item.final_score)}%`, backgroundColor: color(item.final_score) }}
-                  />
-                </Link>
-              ))}
+            <p className="font-body-sm text-on-surface-variant mt-space-xs">{segments.length} loaded segments · bucket totals always equal the route total.</p>
+            <div className="mt-space-lg flex h-5 overflow-hidden rounded-full bg-surface-container">
+              {riskBuckets.map(bucket => bucket.items.length ? <span key={bucket.label} title={`${bucket.label}: ${bucket.items.length}`} style={{ width: `${bucket.items.length / segments.length * 100}%`, backgroundColor: bucket.tint }} /> : null)}
             </div>
-
-            <div className="grid grid-cols-2 gap-space-xs mt-space-lg font-body-sm">
-              <span className="inline-flex items-center gap-space-xs"><i className="w-2 h-2 rounded-full bg-[#2E7D5B]" />Low</span>
-              <span className="inline-flex items-center gap-space-xs"><i className="w-2 h-2 rounded-full bg-[#D99B26]" />Moderate</span>
-              <span className="inline-flex items-center gap-space-xs"><i className="w-2 h-2 rounded-full bg-[#D36128]" />High</span>
-              <span className="inline-flex items-center gap-space-xs"><i className="w-2 h-2 rounded-full bg-[#B93535]" />Severe</span>
-            </div>
+            <div className="mt-space-lg space-y-space-sm">{riskBuckets.map(bucket => <button type="button" key={bucket.label} onClick={() => setSelectedBucket(current => current === bucket.label ? "All" : bucket.label)} className={`w-full text-left flex items-center gap-space-sm rounded-lg p-space-xs transition-colors ${selectedBucket === bucket.label ? "bg-surface-container" : "hover:bg-surface-container-low"}`}><i className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: bucket.tint }} /><div className="flex-1"><div className="flex justify-between font-body-sm"><span>{bucket.label} <span className="text-on-surface-variant">{bucket.range}</span></span><b>{bucket.items.length} · {segments.length ? Math.round(bucket.items.length / segments.length * 100) : 0}%</b></div><div className="h-1.5 rounded-full bg-surface-container mt-1"><div className="h-full rounded-full" style={{ width: `${segments.length ? bucket.items.length / segments.length * 100 : 0}%`, backgroundColor: bucket.tint }} /></div></div></button>)}</div>
+            <div className="mt-space-lg pt-space-md border-t border-surface-variant"><p className="font-label-caps-micro uppercase text-on-surface-variant mb-space-sm">Route-order intensity bars</p><div className="flex h-16 items-end gap-1">{segments.map(item => <Link key={item.segment_id} to={`/segment/${item.segment_id}`} title={`${item.road_name}: ${item.final_score}/100`} className="flex-1 rounded-t-sm min-w-1 transition-transform hover:-translate-y-1" style={{ height: `${Math.max(15, item.final_score)}%`, backgroundColor: color(item.final_score) }} />)}</div></div>
+            <div className="mt-space-md border-t border-surface-variant pt-space-md"><p className="font-label-caps-micro uppercase text-on-surface-variant">{selectedBucket === "All" ? "Select a bucket to inspect its segments" : `${selectedBucket} segments · click for diagnostics`}</p>{selectedBucket !== "All" && <div className="mt-space-xs flex flex-wrap gap-space-xs">{selectedBucketItems.map(item => <Link key={item.segment_id} to={`/segment/${item.segment_id}`} className="font-body-sm px-space-sm py-space-2xs rounded-full bg-surface-container-low hover:bg-secondary-container/30">{item.road_name}</Link>)}</div>}</div>
           </aside>
         </div>
 
@@ -131,52 +140,57 @@ export default function LiveAnalyticsRiskHeatmap() {
           <section className="lg:col-span-7 rounded-[1.75rem] bg-surface-container-lowest border border-surface-variant p-space-lg shadow-sm">
             <div className="flex justify-between gap-space-md">
               <div>
-                <span className="font-label-caps-micro uppercase text-secondary">AI-calibrated forecast</span>
-                <h2 className="font-headline-md mt-space-xs">Diurnal risk distribution curve</h2>
+                <span className="font-label-caps-micro uppercase text-secondary">AI-calibrated route outlook</span>
+                <h2 className="font-headline-md mt-space-xs">Route Risk System</h2>
               </div>
-              <span className="font-body-sm text-on-surface-variant">Derived from loaded risk, time bands and inundation flags</span>
+              <span className="font-body-sm text-on-surface-variant">Current loaded route state · not a future prediction</span>
             </div>
-
-            <div className="h-52 mt-space-lg flex items-end gap-2 border-b border-surface-variant">
-              {hourlyRisk.map(point => (
-                <div key={point.hour} className="group flex-1 h-full flex flex-col justify-end items-center">
-                  <span className="font-label-caps-micro opacity-0 group-hover:opacity-100 mb-space-2xs">{point.score}</span>
-                  <span
-                    className="w-full rounded-t-md bg-secondary-container group-hover:bg-secondary transition-colors"
-                    style={{ height: `${point.score}%` }}
-                  />
-                  <span className="font-body-sm text-on-surface-variant mt-space-xs">{String(point.hour).padStart(2, "0")}</span>
-                </div>
-              ))}
-            </div>
+            {trajectory.length ? <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-space-sm mt-space-lg">
+                <div className="rounded-xl bg-on-surface p-space-md text-surface"><span className="font-label-caps-micro uppercase text-surface/70">Current route risk</span><b className="block text-4xl mt-space-xs">{average}<small className="text-base">/100</small></b></div>
+                <div className="rounded-xl bg-surface-container-low p-space-md"><span className="font-label-caps-micro uppercase text-on-surface-variant">Affected segments</span><b className="block text-4xl mt-space-xs">{affectedSegments}<small className="text-base">/{segments.length}</small></b></div>
+                <div className="rounded-xl bg-surface-container-low p-space-md"><span className="font-label-caps-micro uppercase text-on-surface-variant">Highest-risk node</span><b className="block text-xl mt-space-xs truncate">{highestRisk?.road_name}</b><span className="font-body-sm">{highestRisk?.final_score}/100</span></div>
+                <div className="rounded-xl bg-surface-container-low p-space-md"><span className="font-label-caps-micro uppercase text-on-surface-variant">Route direction</span><b className="block text-xl mt-space-xs">{routeDelta > 0 ? "Rising" : routeDelta < 0 ? "Easing" : "Stable"}</b><span className="font-body-sm">{routeDelta === 0 ? "No change" : `${Math.abs(routeDelta)} pts end to end`}</span></div>
+              </div>
+              <div className="mt-space-lg rounded-[1.75rem] border border-surface-variant bg-[#F7F4EC] p-space-lg">
+                <div className="flex flex-wrap justify-between gap-space-md"><div><span className="font-label-caps-micro uppercase text-secondary">Current exposure field</span><p className="font-body-sm text-on-surface-variant mt-space-2xs">A woven signal field for this route—not a map or forecast. Thickness shows the contribution of each real signal at each segment.</p></div><span className="font-body-sm text-on-surface-variant">Hover or select a segment column to inspect</span></div>
+                <svg viewBox="0 0 760 330" className="w-full h-[24rem] mt-space-md" role="img" aria-label="Interactive current route exposure field">
+                  <defs><linearGradient id="routePulse" x1="0" x2="1"><stop stopColor="#D4A234"/><stop offset=".5" stopColor="#E8C55B"/><stop offset="1" stopColor="#D4A234"/></linearGradient></defs>
+                  {[{ label: "Historical", y: 67, tint: "#7E5A10", value: (item: typeof trajectory[number]) => item.historical_score }, { label: "Weather", y: 117, tint: "#3A7CA5", value: (item: typeof trajectory[number]) => item.weather_modifier * 4 }, { label: "Traffic", y: 167, tint: "#D36128", value: (item: typeof trajectory[number]) => item.traffic_level === "severe" ? 80 : item.traffic_level === "high" ? 56 : item.traffic_level === "medium" ? 30 : 8 }, { label: "Surface", y: 217, tint: "#825AA5", value: (item: typeof trajectory[number]) => item.vision_severity === "severe" ? 88 : item.vision_severity === "moderate" ? 56 : item.vision_severity === "minor" ? 30 : 8 }, { label: "Incident", y: 267, tint: "#B93535", value: (item: typeof trajectory[number]) => item.waterlogging_flag || item.news_flags?.length ? 88 : 8 }].map(row => <g key={row.label}><text x="4" y={row.y + 4} fontSize="11" fill="#716F69">{row.label}</text><line x1="82" x2="742" y1={row.y} y2={row.y} stroke="#DEDCD5" strokeWidth="2"/>{trajectory.slice(0, -1).map((item, index) => { const next = trajectory[index + 1]; const x1 = 86 + index * (650 / Math.max(trajectory.length - 1, 1)); const x2 = 86 + (index + 1) * (650 / Math.max(trajectory.length - 1, 1)); const current = row.value(item); const nextValue = row.value(next); return <path key={`${row.label}-${item.segment_id}`} d={`M ${x1} ${row.y} C ${x1 + 18} ${row.y - current / 5}, ${x2 - 18} ${row.y - nextValue / 5}, ${x2} ${row.y}`} fill="none" stroke={row.tint} strokeWidth={Math.max(3, (current + nextValue) / 18)} strokeLinecap="round" opacity=".78"/>; })}</g>)}
+                  <path d="M82 306 H742" stroke="url(#routePulse)" strokeWidth="10" strokeLinecap="round"/><text x="82" y="325" fontSize="10" fill="#716F69">ORIGIN</text><text x="704" y="325" fontSize="10" fill="#716F69">DESTINATION</text>
+                  {trajectory.map((item, index) => { const x = 86 + index * (650 / Math.max(trajectory.length - 1, 1)); const active = index === activeTrajectoryIndex; return <g key={item.segment_id}><title>{`${item.road_name}: ${item.final_score}/100. Dominant factor: ${dominantFactor(item)}.`}</title><line x1={x} x2={x} y1="38" y2="307" stroke={active ? "#1A1A18" : "#1A1A18"} strokeWidth={active ? "3" : "1"} opacity={active ? ".48" : ".1"}/><circle cx={x} cy="306" r={active ? "10" : "6"} fill={color(item.final_score)} stroke="#fff" strokeWidth="2"/>{(item.waterlogging_flag || item.news_flags?.length) && <circle cx={x} cy="26" r="5" fill="#1A1A18"/>}<rect x={x - 16} y="18" width="32" height="292" fill="transparent" className="cursor-pointer" onClick={() => setActiveTrajectoryIndex(index)}/></g>; })}
+                </svg>
+              </div>
+              <div className="rounded-xl bg-surface-container-low p-space-md flex flex-wrap items-center justify-between gap-space-sm">
+                <div><span className="font-label-caps-micro uppercase text-secondary">Selected segment {String((activeTrajectory?.index ?? 0) + 1).padStart(2, "0")}</span><p className="font-body-md mt-space-2xs font-semibold">{activeTrajectory?.road_name} · {activeTrajectory?.final_score}/100</p></div>
+                <div className="font-body-sm text-on-surface-variant">Dominant factor: {activeTrajectory ? dominantFactor(activeTrajectory) : "—"} · {activeTrajectory?.waterlogging_flag || activeTrajectory?.news_flags?.length ? "active advisory" : "no active advisory"}</div>
+              </div>
+            </> : <p className="mt-space-lg font-body-sm text-on-surface-variant">Analyze a route to plot its actual segment trajectory.</p>}
           </section>
 
           <aside className="lg:col-span-5 rounded-[1.75rem] bg-surface-container-lowest border border-surface-variant p-space-lg shadow-sm">
             <span className="font-label-caps-micro uppercase text-secondary">Detection feed</span>
-            <h2 className="font-headline-md mt-space-xs">Automated telemetry events</h2>
+            <h2 className="font-headline-md mt-space-xs">Active detections only</h2>
 
             <div className="mt-space-md divide-y divide-surface-variant">
-              {segments
-                .slice()
-                .sort((a, b) => b.final_score - a.final_score)
-                .map(item => (
+              {detectionEvents.length ? detectionEvents.slice(0, 8).map(({ segment, kind, detail }, index) => (
                   <Link
-                    key={item.segment_id}
-                    to={`/segment/${item.segment_id}`}
+                    key={`${segment.segment_id}-${kind}-${index}`}
+                    to={`/segment/${segment.segment_id}`}
                     className="py-space-sm flex gap-space-sm hover:bg-surface-container-low transition-colors"
                   >
                     <span className="w-7 h-7 shrink-0 flex items-center justify-center rounded-full bg-surface-container text-secondary">
                       <Clock3 size={14} />
                     </span>
                     <span>
-                      <b className="font-body-sm">{item.road_name}</b>
+                      <b className="font-body-sm">{kind} · {segment.road_name}</b>
                       <span className="block font-body-sm text-on-surface-variant">
-                        {item.news_flags?.[0] ?? `${item.vision_severity} surface assessment recorded`} · Risk {item.final_score}/100
+                        {detail} · Risk {segment.final_score}/100
                       </span>
                     </span>
                     <ChevronRight size={15} className="ml-auto mt-1 text-on-surface-variant" />
                   </Link>
-                ))}
+                )) : <p className="py-space-md font-body-sm text-on-surface-variant">No active weather, traffic, vision, inundation, or news detections on this loaded route.</p>}
             </div>
           </aside>
         </div>
@@ -185,7 +199,7 @@ export default function LiveAnalyticsRiskHeatmap() {
           <div className="flex justify-between items-center gap-space-md">
             <div>
               <span className="font-label-caps-micro uppercase text-secondary">Signal inventory</span>
-              <h2 className="font-headline-md mt-space-xs">Segment telemetry</h2>
+              <h2 className="font-headline-md mt-space-xs">Complete segment telemetry</h2>
             </div>
             <span className="font-body-sm text-on-surface-variant">Click a row for the full AI breakdown</span>
           </div>
@@ -203,7 +217,7 @@ export default function LiveAnalyticsRiskHeatmap() {
                     <h3 className="font-body-md font-semibold">{item.road_name}</h3>
                   </div>
                   <p className="font-body-sm text-on-surface-variant mt-space-xs">
-                    {item.waterlogging_flag ? "Inundation flag" : "No inundation flag"} · {item.vision_severity} vision severity · {item.traffic_level} traffic
+                    {item.waterlogging_flag ? "Inundation flag" : "No inundation flag"} · {item.vision_severity} vision · {item.traffic_status === "unavailable" ? "traffic unavailable" : `${item.traffic_level} traffic`} · {item.weather_status === "unavailable" ? "weather unavailable" : item.weather_modifier ? `weather +${item.weather_modifier}` : "weather clear"}
                   </p>
                 </div>
 

@@ -1,5 +1,5 @@
 //frontend/src/types/route.ts
-export type TrafficLevel = "low" | "medium" | "high" | "severe";
+export type TrafficLevel = "low" | "medium" | "high" | "severe" | "unavailable";
 export type VisionSeverity = "none" | "minor" | "moderate" | "severe";
 export type ImageSource = "mapillary" | "rdd2022_sample" | "no_image_available";
 
@@ -16,7 +16,15 @@ export interface RouteSegment {
   historical_score: number;
   time_pattern_modifier: number;
   weather_modifier: number;
+  weather_status?: "live" | "unavailable";
+  weather_precipitation_mm?: number;
+  weather_wind_kmh?: number;
+  weather_visibility_m?: number | null;
   traffic_level: TrafficLevel;
+  traffic_status?: "live" | "unavailable";
+  traffic_current_speed_kmh?: number;
+  traffic_free_flow_speed_kmh?: number;
+  traffic_flow_ratio?: number;
   waterlogging_flag: boolean;
   vision_severity: VisionSeverity;
   vision_source: ImageSource;

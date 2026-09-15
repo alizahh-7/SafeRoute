@@ -11,10 +11,11 @@ about this again.
 """
 
 import os
+from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 ORS_API_KEY = os.getenv("ORS_API_KEY")
 ORS_URL = "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
 
