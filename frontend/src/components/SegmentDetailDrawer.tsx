@@ -77,10 +77,10 @@ const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
                     </div>
                   </div>
                   <div className="breakdown-item">
-                    <span className="label">Traffic ({segment.traffic_level})</span>
-                    <span className="text-muted" style={{ fontSize: '0.7rem' }}>Source: TomTom live traffic</span>
+                    <span className="label">Traffic ({segment.traffic_status === "unavailable" ? "feed unavailable" : segment.traffic_level})</span>
+                    <span className="text-muted" style={{ fontSize: '0.7rem' }}>Source: {segment.traffic_status === "unavailable" ? "TomTom feed unavailable — no score contribution" : "TomTom live traffic"}</span>
                     <div className="bar-bg">
-                      <motion.div className="bar-fill" initial={{ width: 0 }} animate={{ width: segment.traffic_level === 'severe' ? '90%' : segment.traffic_level === 'high' ? '70%' : '30%' }} transition={{ duration: 1, delay: 0.3 }} />
+                      <motion.div className="bar-fill" initial={{ width: 0 }} animate={{ width: segment.traffic_status === "unavailable" ? '0%' : segment.traffic_level === 'severe' ? '90%' : segment.traffic_level === 'high' ? '70%' : segment.traffic_level === 'medium' ? '50%' : '30%' }} transition={{ duration: 1, delay: 0.3 }} />
                     </div>
                   </div>
                   {segment.waterlogging_flag && (

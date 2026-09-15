@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
 import feedparser
+import requests
 
 
 RISK_KEYWORDS = [
@@ -52,15 +53,14 @@ def _get_raw_results(road_name):
     return _raw_cache[road_name]
 
 
-def check_news(road_name, max_results=5):
-    query = road_name.replace(" ", "+") + "+Hyderabad+road"
-
-    url = (
-        "https://news.google.com/rss/search"
-        f"?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
-    )
-
-    feed = feedparser.parse(url)
+def check_news(road_name, max_results=12):
+    params = {"q": f'"{road_name}" Hyderabad road', "hl": "en-IN", "gl": "IN", "ceid": "IN:en"}
+    try:
+        response = requests.get("https://news.google.com/rss/search", params=params, headers={"User-Agent": "SafeRouteTelangana/1.0"}, timeout=8)
+        response.raise_for_status()
+        feed = feedparser.parse(response.content)
+    except requests.exceptions.RequestException:
+        return []
 
     return [
         {
@@ -70,6 +70,17 @@ def check_news(road_name, max_results=5):
         }
         for entry in feed.entries[:max_results]
     ]
+
+
+def _road_terms(road_name):
+    ignored = {"road", "street", "lane", "flyover", "junction", "highway", "the", "and"}
+    return [term.lower() for term in road_name.replace("-", " ").split() if len(term) >= 4 and term.lower() not in ignored]
+
+
+def _is_road_relevant(title, road_name):
+    title = title.lower()
+    terms = _road_terms(road_name)
+    return bool(terms) and any(term in title for term in terms)
 
 
 def get_news_flags(road_name):
@@ -82,14 +93,10 @@ def get_news_flags(road_name):
     if road_name in _news_cache:
         return _news_cache[road_name]
     results = _get_raw_results(road_name)
-    # Use the first meaningful word of the road name to confirm relevance
-    # (e.g. "Khairatabad" from "Khairatabad Flyover")
-    road_keyword = road_name.split()[0].lower()
-
     relevant = [
         result["title"]
         for result in results
-        if road_keyword in result["title"].lower()
+        if _is_road_relevant(result["title"], road_name)
         and any(keyword in result["title"].lower() for keyword in RISK_KEYWORDS)
     ]
     flags = relevant if relevant else None
@@ -172,7 +179,7 @@ def get_news_flags_weighted(road_name):
     relevant = []
 
     for result in results:
-        if any(
+        if _is_road_relevant(result["title"], road_name) and any(
             keyword in result["title"].lower()
             for keyword in RISK_KEYWORDS
         ):

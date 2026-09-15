@@ -1,230 +1,215 @@
 # SafeRoute Telangana
 
-SafeRoute Telangana is an explainable road-safety analysis prototype for journeys in and around Hyderabad/Telangana. It obtains a driving route, divides it into approximately 500 m segments, enriches each segment with historical crash proximity, current weather, traffic, known waterlogging locations, road-surface vision, and local news, then returns a 0–100 composite risk score with a plain-language explanation.
+SafeRoute Telangana is an explainable civic road-safety intelligence application for journeys in Hyderabad and across Telangana. It is built around a simple premise: conventional navigation optimises for time and distance, while a safety-aware route decision should make crash history, weather, congestion, inundation, road condition, and incident context visible before a driver commits to a corridor.
 
-Built for the AI Careers for Women (AICW) Capstone Program, supported by Microsoft.
+The project was developed for the **AI Careers for Women (AICW) Capstone Program**, supported by Microsoft.
 
-## Why SafeRoute
+> SafeRoute is a decision-support prototype. It is not emergency guidance, a collision-prediction service, or a replacement for official traffic instructions.
 
-Traditional navigation minimizes travel time or distance. SafeRoute is a decision-support layer: it exposes safety-relevant evidence and the uncertainty around that evidence so a driver can compare route trade-offs. It is not a collision prediction service or emergency guidance.
+## Product capabilities
 
-## What It Currently Does
+- Search a Hyderabad/Telangana journey using origin/destination autocomplete and analyze the route.
+- Split route geometry into approximately 500 m segments and calculate a transparent 0–100 safety score for each segment.
+- Inspect the full route on an interactive Leaflet map, including road-level scores, weather, traffic, vision, incident, and advisory context.
+- Open a segment AI diagnostics page that explains the score’s historical crash, weather/inundation, traffic, road-surface vision, and news/dispatch inputs.
+- Compare a backend-scored alternate route when it is meaningfully safer within the configured time trade-off.
+- Run a real-time hazard/reroute advisory and route-drive simulation from the currently loaded route data.
+- Download a one-page safety report for the active route and a structured safety report for saved corridors.
+- Use the Live Analytics & Risk Heatmap workspace to inspect spatial risk, active detections, signal inventory, exact risk distribution, and the route’s current exposure field.
+- Maintain session-level route/hazard/reroute counters persisted locally in the browser.
 
-With working provider credentials and runtime assets, the backend:
+## User journey
 
-1. Geocodes origin/destination names with Nominatim.
-2. Requests an OpenRouteService driving route.
-3. Splits the polyline into fixed-length segments.
-4. Reverse-geocodes each midpoint to a road/locality name.
-5. Scores historical crash and black-spot proximity, then applies a day-of-week modifier.
-6. Requests Open-Meteo weather and TomTom traffic per segment.
-7. Flags waterlogging only when adverse weather and a static waterlogging point coincide.
-8. Queries Mapillary at start/middle/end segment points and runs YOLOv8. If local RDD2022 test images are available, it falls back to one when Mapillary has no coverage.
-9. Queries Google News RSS for road-name-relevant hazard headlines.
-10. Adds those signals into a capped segment score, averages segments for a route score, and evaluates OpenRouteService alternatives.
+```text
+Overview
+  └── Safe Route Finder
+        └── Route Results
+              ├── Segment AI Diagnostics & Risk Breakdown
+              ├── Live Analytics & Risk Heatmap
+              ├── Real-Time Hazard & Reroute Advisory
+              ├── Download Safety Report
+              └── Saved Corridors & Historical Commute Archive
 
-The React application calls FastAPI through `VITE_API_BASE_URL` (default `http://127.0.0.1:8000`) and renders route results, maps, segment diagnostics, a reroute advisory, a loaded-route heatmap, and supporting pages.
+Global navigation / footer
+  ├── How SafeRoute Works
+  ├── System Architecture & Methodology
+  └── Capstone Team & Microsoft Evaluator Showcase
+```
 
-### Current boundaries
+The active route is held in React route context for the current browser session. Segment diagnostics, analytics, advisory, and saved-corridor screens therefore use the same loaded data rather than independently fabricated examples.
 
-- The repository does **not** include `backend/data/india_subset/test/images`; the RDD2022 fallback path is unavailable in a fresh checkout unless those assets are restored.
-- Waterlogging and black-spot data are static CSV reference data, not live municipal feeds.
-- News urgency/recency helpers exist but are not used by final risk fusion.
-- Saved routes and route state are not persisted.
-
-## System Architecture
+## Architecture
 
 ```mermaid
 flowchart LR
-  UI[React/Vite] -->|POST /route-risk| API[FastAPI]
-  API --> PIPE[main.run_pipeline]
-  PIPE --> GEO[Nominatim]
-  PIPE --> ORS[OpenRouteService]
-  ORS --> SEG[500 m segmentation]
-  SEG --> HIST[Crash + black-spot score]
-  SEG --> LIVE[Weather + traffic + waterlogging]
-  SEG --> VISION[Mapillary + YOLOv8]
-  SEG --> NEWS[Google News RSS]
-  HIST --> FUSE[Additive fusion]
-  LIVE --> FUSE
-  VISION --> FUSE
-  NEWS --> FUSE
-  FUSE --> API
-  API --> UI
+  A[React + Vite frontend] -->|POST /route-risk| B[FastAPI]
+  B --> C[Pipeline orchestrator]
+  C --> D[Nominatim geocoding]
+  D --> E[OpenRouteService geometry]
+  E --> F[~500 m segmentation]
+  F --> G[IIT Delhi crash + black-spot scoring]
+  F --> H[Open-Meteo weather]
+  F --> I[TomTom traffic]
+  F --> J[Waterlogging reference points]
+  F --> K[Mapillary → YOLOv8]
+  F --> L[Google News RSS]
+  G --> M[Explainable risk fusion]
+  H --> M
+  I --> M
+  J --> M
+  K --> M
+  L --> M
+  M --> B
+  B --> A
 ```
 
-## End-to-End Pipeline
+## Risk model
 
-### Routing and segmentation
+Each route segment is evaluated independently. The backend fuses these currently available components:
 
-- `backend/src/api_clients/geocode.py`: Nominatim search/reverse-geocode with Hyderabad-biased queries and a one-second delay after successful calls.
-- `backend/src/api_clients/maps_routing.py`: OpenRouteService GeoJSON driving routes; converts GeoJSON `[lon, lat]` to internal `(lat, lon)`.
-- `backend/src/data_pipeline/segmentation.py`: creates UUID-prefix IDs and groups polyline points into roughly 500 m segments.
+| Signal | Source | Contribution / behavior |
+|---|---|---|
+| Historical crash context | IIT Delhi Telangana-filtered crash data + black-spot CSV | Base historical score using proximity and severity. |
+| Day pattern | Crash-data weekday profile | Modifies historical exposure by current day-of-week evidence. |
+| Weather | Open-Meteo current precipitation, wind, visibility | Adds 0, 10, or 20 points based on adverse conditions. A clear live reading correctly contributes 0. |
+| Traffic | TomTom flow segment current/free-flow speed ratio | Maps to low 0, medium 5, high 12, severe 20 points. |
+| Inundation | Static municipal/GHMC-style waterlogging reference coordinates + live weather | Flags only when a segment is near a reference point and weather is adverse. |
+| Surface condition | Mapillary imagery where covered, analyzed by YOLOv8; RDD2022 fallback when available | Adds none 0, minor 5, moderate 12, severe 22 points. |
+| News | Google News RSS road-name-relevant hazard headlines | Uses urgency/recency-derived score, capped in risk fusion. |
 
-### Historical risk
+The segment score is capped at 100; the route score is the arithmetic mean of scored segments. Explanations are generated from the actual contributions recorded on each segment.
 
-`backend/clean_data.py` derives:
+### Provider integrity
 
-```text
-severity = killed × 5 + injured × 1
-```
+SafeRoute does not silently turn failed external calls into safe-looking readings:
 
-`historical_score.py` checks black spots within 400 m and crashes within 300 m:
-
-```text
-historical_score = 0.6 × max_blackspot_proximity_score
-                 + 0.4 × nearby_crash_severity_score
-```
-
-`time_pattern.py` multiplies this historical score by the current day-of-week profile. The source lacks hour-level data.
-
-### Live and reference signals
-
-- **Weather:** `weather.py` requests Open-Meteo precipitation, wind and visibility; only precipitation/wind thresholds contribute. Request failure returns 0.
-- **Traffic:** `traffic.py` requests TomTom flow data and maps current/free-flow ratio to low/medium/high/severe. It has no error fallback.
-- **Waterlogging:** `waterlogging.py` reads static CSV coordinates and matches within 300 m.
-- **News:** `news_check.py` queries Google News RSS, applies road-name plus hazard-keyword filtering, and caches process-local results. `get_news_flags_weighted` is not called by fusion.
-
-### Risk engine
-
-`backend/src/risk_engine/fusion.py` currently calculates:
-
-```text
-final_score = min(100,
-  historical_score + weather_modifier + traffic_points
-  + (15 if waterlogging_flag else 0)
-  + vision_points + (8 if news_flags else 0)
-)
-```
-
-Traffic points are low 0, medium 5, high 12, severe 20. Vision points are none 0, minor 5, moderate 12, severe 22. Route total risk is the arithmetic mean of segment scores.
-
-## AI / ML
-
-### Road-damage model
-
-- **Architecture:** YOLOv8s; bundled weights `backend/src/vision/best.pt` (~22.5 MB).
-- **Training data:** RDD2022 India subset.
-- **Classes:** longitudinal crack, transverse crack, alligator crack, other corruption, pothole.
-- **Training script:** `backend/src/vision/train.py`; 50 epochs, 640 px, batch 16, `yolov8s.pt`. The code does not explicitly pass an optimizer; project documentation records an Ultralytics auto/AdamW run.
-- **Documented split:** train 5,368; validation 1,172; test 1,166.
-- **Retained v2 result:** overall mAP50 0.404, precision 0.530, recall 0.374.
-- **v3 experiment:** `augment_data.py` brightness-augmented transverse-crack images. Documentation reports transverse mAP50 improved 0.187 → 0.227 while overall mAP50 regressed 0.404 → 0.391; v2 was retained.
-
-`detect.py` generates an ordinal `none/minor/moderate/severe` severity from confidence, class weighting, bounding-box area (assuming 640 × 640) and detection count. It downloads URL images before inference to avoid the documented Mapillary URL/video-stream issue.
-
-### Mapillary behavior
-
-`vision_pipeline.py` queries Mapillary at a fixed 50 m radius for a segment’s start/middle/end. If no image exists, it tries a random local RDD2022 test image. That dataset folder is currently absent, so a fresh runtime produces `none/no_image_available` rather than a fallback image.
-
-### AI limitations
-
-RDD2022 India is India-wide rather than Hyderabad-specific. Mapillary coverage can be sparse at 50 m. Transverse-crack validation support is documented as scarce. Vision severity is an additive ordinal signal, not a calibrated probability of road failure.
+- Open-Meteo clear weather appears as **live clear / no score lift**, not “missing weather.”
+- TomTom failures or absent credentials appear as **traffic unavailable** and contribute no made-up traffic risk.
+- Mapillary no-coverage falls back to bundled RDD2022 imagery only when that local asset is present; otherwise vision is marked unavailable.
+- Google News returning no road-relevant hazard headline is a valid “no relevant reports” result.
+- Waterlogging data is a static reference dataset, not a real-time municipal sensor feed.
 
 ## Frontend
 
-React 19 + TypeScript + Vite, React Router, Leaflet and React-Leaflet.
+The frontend is a React 19 + TypeScript + Vite application. It uses Tailwind design tokens, React Router, Leaflet/React-Leaflet, Framer Motion, and jsPDF.
 
-| Route | Purpose | Data behavior |
+| Route | Screen | Data behavior |
 |---|---|---|
-| `/` | Executive overview | Editorial/static |
-| `/route-planner` | Origin/destination, autocomplete, geolocation, city news | FastAPI |
-| `/route` | Route summary, Leaflet map, segment list | In-memory route context |
-| `/segment/:segmentId` | Segment AI diagnostics | In-memory route context |
-| `/hazard-advisory` | Worst/lowest loaded-segment advisory | In-memory route context |
-| `/analytics` | Loaded-route heatmap and derived charts | In-memory route context |
-| `/saved-corridors` | Commute archive/watchlist | UI state and presets only |
-| `/methodology` | Architecture and model disclosure | Editorial/static |
-| `/capstone-showcase` | Team and source showcase | Editorial/static |
-| `/about` | How SafeRoute Works | Editorial/static |
+| `/` | Overview | Product narrative, entry points, session stats. |
+| `/route-planner` | Safe Route Finder | Search, location suggestions, city news, and route submission. |
+| `/route` | Route Results | Current route context, interactive map, simulation, alternate route, route PDF. |
+| `/segment/:segmentId` | Segment Diagnostics | Current route context; detailed factor breakdown. |
+| `/hazard-advisory` | Hazard & Reroute Advisory | Current route and alternate-route context. |
+| `/analytics` | Live Analytics & Risk Heatmap | Current route context and derived visualizations. |
+| `/saved-corridors` | Saved Corridors Archive | Current route context plus local watchlist UI state. |
+| `/about` | How SafeRoute Works | Supporting product information. |
+| `/methodology` | Architecture & Methodology | Supporting technical/evaluator information. |
+| `/capstone-showcase` | Team & Evaluator Showcase | Supporting capstone information. |
 
-```text
-Route Finder → POST /route-risk → Route Results → Segment Diagnostics
-                                         ├→ Analytics Heatmap
-                                         └→ Hazard Advisory
-Route Finder → Saved Corridors
-Global navigation/footer → About, Methodology, Capstone Showcase
-```
+### Analytics workspace
 
-The active route is held only in `frontend/src/context/RouteContext.tsx`. Refreshes and direct deep-links cannot restore it. Header links to fixed segment IDs also require a current matching route.
+Analytics is intentionally based on the loaded route, not a citywide dashboard pretending to have backend aggregation that does not exist.
+
+- **Corridor Heatmap:** segment midpoint risk plotted on the actual current route geometry.
+- **Risk Distribution:** Low (0–29), Moderate (30–49), High (50–74), and Severe (75–100) counts and percentages derived directly from all loaded segments. Bucket selection reveals the represented segment links.
+- **Current Exposure Field:** an interactive layered signal weave. Historical, weather, traffic, surface, and incident ribbons vary in thickness according to actual per-segment contribution; selecting a segment exposes its road, risk score, dominant factor, and advisory state.
+- **Detection Feed:** active weather, traffic, vision, inundation, and news events only.
+- **Signal Inventory:** the complete segment telemetry ledger, including clear and unavailable statuses.
 
 ## Backend API
 
-Entry point: `backend/api/main.py`.
+FastAPI entry point: `backend/api/main.py`.
 
 | Method | Endpoint | Request | Response |
 |---|---|---|---|
-| POST | `/route-risk` | `{ origin, destination }` | `{ route_total_risk, segments }` |
-| POST | `/alternate-route` | `{ origin, destination }` | availability, risks, time delta, optional segment lists |
-| GET | `/location-suggestions?q=` | query | Nominatim-derived suggestions |
-| GET | `/reverse-geocode?lat=&lon=` | query | `{ label }` |
-| GET | `/city-news` | none | `{ headlines }` |
+| `POST` | `/route-risk` | `{ "origin", "destination" }` | Route total, scored segments, reroute prompt status. |
+| `POST` | `/alternate-route` | `{ "origin", "destination" }` | Availability, primary/alternate risks, time delta, optional segment lists. |
+| `GET` | `/location-suggestions?q=` | Search query | Nominatim-derived suggestions. |
+| `GET` | `/reverse-geocode?lat=&lon=` | Coordinates | Display label. |
+| `GET` | `/city-news` | None | Hyderabad RSS headlines. |
+| `GET` | `/vision-fallback/:file` | Image filename | Local RDD2022 fallback image when available. |
 
-There are no explicit response models or provider-error translation. CORS allows only `http://localhost:5173`; configure `VITE_API_BASE_URL` accordingly.
+The frontend API base defaults to `http://127.0.0.1:8000` and can be overridden through `VITE_API_BASE_URL`.
 
-## Data Inventory
-
-| File/source | Current contents/use | Status |
-|---|---|---|
-| `backend/data/processed/telangana_crashes.csv` | 114 rows with coordinates, weekday, killed/injured and derived severity | Runtime input |
-| `backend/data/raw/news_crashes.xlsx` | source workbook | Present; not runtime input |
-| `backend/data/external/black_spots.csv` | 38 location rows | Runtime input; provenance/validation should be reviewed |
-| `backend/data/external/waterlogging_points.csv` | 121 coordinate rows | Runtime input; static reference data |
-| `backend/src/vision/best.pt` | model weights | Runtime asset |
-| `backend/data/india_subset/` | training/fallback imagery expected by code | **Absent** |
-| `frontend/src/assets.config.ts` | Unsplash/pravatar assets | Display-only placeholders |
-
-## Project Structure
+## Repository layout
 
 ```text
 SafeRoute/
 ├── backend/
-│   ├── api/main.py                  # FastAPI endpoints
-│   ├── main.py                      # pipeline orchestration / CLI
+│   ├── api/main.py                 # FastAPI endpoints and CORS/static fallback mount
+│   ├── main.py                     # route scoring orchestration
+│   ├── clean_data.py               # crash-data preparation utility
+│   ├── inspect_data.py             # dataset inspection utility
 │   ├── src/
-│   │   ├── api_clients/             # Nominatim and OpenRouteService
-│   │   ├── data_pipeline/           # segmentation
-│   │   ├── live_signals/            # weather, traffic, waterlogging
-│   │   ├── news/                    # Google News RSS
-│   │   ├── risk_engine/             # historical score, fusion, explanations
-│   │   ├── routing/                 # alternate routes
-│   │   └── vision/                  # model, inference, training, augmentation
-│   ├── data/                        # raw, processed and static external files
-│   ├── docs/                        # notes/API contract
-│   └── tests/test_pipeline.py
+│   │   ├── api_clients/            # Nominatim + OpenRouteService
+│   │   ├── data_pipeline/          # route segmentation
+│   │   ├── live_signals/           # weather, traffic, inundation
+│   │   ├── news/                   # Google News RSS relevance and risk
+│   │   ├── risk_engine/            # historical scoring, fusion, explanations
+│   │   ├── routing/                # safer alternate selection
+│   │   └── vision/                 # YOLOv8 inference, training, augmentation, Mapillary
+│   ├── data/
+│   │   ├── external/               # black spots + waterlogging reference points
+│   │   ├── processed/              # Telangana crash dataset
+│   │   ├── raw/                    # source workbook/data dictionary
+│   │   └── india_subset/           # local RDD2022 fallback images
+│   ├── docs/                       # API contract and methodology notes
+│   └── tests/                      # pipeline tests
 ├── frontend/
-│   ├── src/pages/                   # application routes
-│   ├── src/components/              # maps, drawer, layout
-│   ├── src/context/RouteContext.tsx # in-memory route state
-│   └── src/services/api.ts          # fetch client
+│   ├── src/components/             # maps, navigation, drawer, images, badges
+│   ├── src/context/RouteContext.tsx# active-route/session state
+│   ├── src/pages/                  # product and supporting routes
+│   ├── src/services/api.ts          # FastAPI client
+│   └── src/types/route.ts           # shared route segment contract
 ├── requirements.txt
-└── .env.example
+├── .env.example
+└── README.md
 ```
 
-## Setup (Windows)
+## Data and model assets
 
-### Backend
+- `backend/data/processed/telangana_crashes.csv`: Telangana-filtered crash rows used for proximity and day-pattern scoring.
+- `backend/data/external/black_spots.csv`: black-spot reference locations.
+- `backend/data/external/waterlogging_points.csv`: 121 waterlogging reference coordinates.
+- `backend/data/raw/news_crashes.xlsx` and `Data Dictionary.xlsx`: raw/source project data artifacts.
+- `backend/src/vision/best.pt`: local YOLOv8 weights.
+- `backend/data/india_subset/test/images/`: RDD2022 India fallback imagery served to the browser when Mapillary coverage is absent.
+
+## Local setup
+
+### Prerequisites
+
+- Python 3.10+ with a virtual environment
+- Node.js 20+ and npm
+- Provider credentials for OpenRouteService, TomTom, and Mapillary
+- Network access for external providers and map tiles
+
+### Environment
+
+Create a **root** `.env` file from `.env.example`. The backend explicitly loads this root file, so it works whether Uvicorn is started from the project root or `backend/`.
+
+```text
+ORS_API_KEY=your_openrouteservice_key
+TOMTOM_API_KEY=your_tomtom_key
+MAPILLARY_TOKEN=your_mapillary_access_token
+```
+
+Never commit `.env` or provider credentials.
+
+### Start the backend
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Copy-Item .\.env.example .\backend\.env
+
 Set-Location backend
-..\.venv\Scripts\python.exe -m uvicorn api.main:app --reload
+..\.venv\Scripts\python.exe -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Place provider variables in `backend/.env` because backend code uses `load_dotenv()` from its current working directory:
+### Start the frontend
 
-```text
-ORS_API_KEY
-TOMTOM_API_KEY
-MAPILLARY_TOKEN
-```
-
-`OPENWEATHERMAP_API_KEY` remains in `.env.example`, but current weather code uses Open-Meteo and does not read it.
-
-### Frontend
+In a second terminal:
 
 ```powershell
 Set-Location frontend
@@ -233,11 +218,18 @@ $env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
 npm run dev
 ```
 
-Vite normally serves `http://localhost:5173`, the only origin currently allowed by FastAPI CORS.
+Open the Vite URL shown in the terminal, normally `http://localhost:5173` or `http://127.0.0.1:5173`.
 
-## Testing
+## Verification
 
-### Backend
+### Frontend build
+
+```powershell
+Set-Location frontend
+npm run build
+```
+
+### Backend tests
 
 ```powershell
 Set-Location backend
@@ -245,47 +237,25 @@ $env:PYTHONPATH = "."
 ..\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-Tests combine offline checks with provider/model-dependent route and alternate-route checks. They need credentials, network access, and usable vision assets.
+### Manual route check
 
-### Frontend
+1. Run backend and frontend with valid root `.env` credentials.
+2. Open **Safe Route Finder** and analyze a Hyderabad route, for example `Ameerpet, Hyderabad` to `Secunderabad, Hyderabad`.
+3. Confirm Route Results shows segment data; open map markers to inspect live/clear/unavailable signal states.
+4. Open a segment diagnostics page to verify source-labelled factor breakdown.
+5. Open Analytics; select an Exposure Field segment and a Risk Distribution bucket, then verify the shown roads match the loaded route.
+6. Download the route or saved-corridor safety report and compare contents with on-screen segment data.
 
-```powershell
-Set-Location frontend
-npm run lint
-npm run build
-```
+## Known limitations
 
-At this README update, lint completes with warnings. Build is blocked by two unused imports (`Clock`, `CloudRain`) in `src/pages/RoutePlanner.tsx`; remove/use them before release.
-
-## Known Limitations
-
-- Provider errors are handled inconsistently: weather returns zero on network failure, whereas traffic/geocoding/routing/reverse-geocoding/news/model failures can surface as server errors.
-- Segment IDs are newly generated per request; there is no persistence, saved-route API, or shareable diagnostic deep-link.
-- Saved Corridors uses presets/local component state; it is not a persistence service.
-- Hazard Advisory compares worst/lowest segments from the same loaded route; it does not render an independently generated alternate route.
-- The analytics diurnal chart is derived from loaded scores/time bands, not a historical hourly forecast.
-- `backend/docs/api_contract.md` is stale: it says `image_url` needs adding, but multi-point vision already returns it.
-
-## Security Notes
-
-- `.env` is ignored by Git; never commit provider tokens.
-- The API has no authentication or rate limiting and allows all methods/headers for its one development origin.
-- Provider tokens are backend-only; the frontend does not bundle them.
-- Map tiles, Mapillary imagery, Google fonts and some editorial assets load from external services.
-- Request strings are minimally schema-validated; outbound providers receive user text/coordinates.
+- Route/segment state is intentionally in-memory and is not restored after a full page refresh.
+- Saved Corridors is a frontend watchlist tied to the loaded route; a server-side persistence API is future work.
+- Waterlogging points and black spots are reference datasets and must be refreshed from authoritative sources for production use.
+- Mapillary imagery can be unavailable for a specific street even with a valid token; local RDD2022 imagery is a fallback sample, not a location-matched image.
+- News relevance depends on RSS indexing and road-name matching. No relevant headline is not evidence that an incident does not exist.
+- The hazard advisory simulates movement over returned route geometry. It does not connect to a live vehicle GPS feed.
+- Provider availability, quotas, and data quality remain external dependencies.
 
 ## Team
 
-The repository identifies the AICW team as Umaima, Alizah, Zunairah and Shazia.
-
-### Vision & News Modules — Zunairah
-
-- YOLOv8 road-damage detection and weighted severity scoring
-- RDD2022 India training documentation and targeted transverse-crack augmentation experiment
-- precision/recall and v2/v3 comparison documentation
-- Mapillary multi-point lookup and RDD fallback design
-- URL/image handling fix for YOLO inference
-- Google News RSS relevance filtering, urgency classification and recency-weighting helpers
-- vision/news pipeline testing documentation and frontend contribution
-
-Other role statements should be reviewed by the team before external publication.
+Built by **Zunairah, Umaima, Alizah, and Shazia** for the AICW Capstone Program.

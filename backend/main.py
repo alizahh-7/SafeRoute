@@ -15,18 +15,16 @@ from src.risk_engine.fusion import fuse_all_segments, route_total_risk
 from src.news.news_check import get_news_flags, news_risk_score
 from src.vision.detect import load_model
 from src.vision.vision_pipeline import get_segment_vision_severity_multi
-from src.live_signals.weather import get_weather_modifier
-from src.live_signals.traffic import get_traffic_level
-from src.live_signals.waterlogging import load_waterlogging_points, is_near_waterlogging_point
+from src.live_signals.weather import get_weather_signal
+from src.live_signals.traffic import get_traffic_signal
+from src.live_signals.waterlogging import load_waterlogging_points, get_inundation_signal
 
 
 def apply_real_weather_and_traffic(segment: dict, waterlogging_points) -> dict:
     lat, lon = segment["midpoint"]["lat"], segment["midpoint"]["lng"]
-    segment["weather_modifier"] = get_weather_modifier(lat, lon)
-    segment["traffic_level"] = get_traffic_level(lat, lon)
-    segment["waterlogging_flag"] = (
-        segment["weather_modifier"] >= 10 and is_near_waterlogging_point(lat, lon, waterlogging_points)
-    )
+    segment.update(get_weather_signal(lat, lon))
+    segment.update(get_traffic_signal(lat, lon))
+    segment.update(get_inundation_signal(lat, lon, waterlogging_points, segment["weather_modifier"]))
     return segment
 
 
@@ -34,8 +32,10 @@ def apply_real_vision_and_news(segment: dict, vision_model) -> dict:
     severity, source, image_url = get_segment_vision_severity_multi(vision_model, segment["coordinates"])
     segment["vision_severity"] = severity
     segment["vision_source"] = source
+    segment["vision_status"] = "live" if source == "mapillary" else "fallback" if source == "rdd2022_sample" else "unavailable"
     segment["image_url"] = image_url
     segment["news_flags"] = get_news_flags(segment["road_name"])
+    segment["news_status"] = "live" if segment["news_flags"] else "no_relevant_reports"
     segment["news_risk_score"] = news_risk_score(segment["road_name"])
     return segment
 

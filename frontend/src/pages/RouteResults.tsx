@@ -318,8 +318,8 @@ const RouteResults = () => {
                   <div>
                     <div className="font-body-md font-semibold">{seg.road_name}</div>
                     <div className="font-body-sm text-on-surface-variant mt-space-2xs flex items-center gap-space-xs flex-wrap">
-                      <Eye size={12} /> {seg.vision_severity} surface · {seg.traffic_level} traffic
-                      {seg.weather_modifier >= 10 ? <><CloudRain size={12} className="text-[#3A7CA5]" /> adverse weather</> : null}
+                      <Eye size={12} /> {seg.vision_severity} surface · {seg.traffic_status === "unavailable" ? "traffic unavailable" : `live ${seg.traffic_level} traffic`}
+                      {seg.weather_status === "unavailable" ? <><CloudRain size={12} className="text-on-surface-variant" /> weather unavailable</> : seg.weather_modifier >= 10 ? <><CloudRain size={12} className="text-[#3A7CA5]" /> live weather caution</> : <span>· weather clear</span>}
                       {seg.waterlogging_flag ? <span className="text-[#B93535]">waterlogging</span> : null}
                       {seg.news_flags?.length ? <><AlertTriangle size={12} className="text-[#B93535]" /> news</> : null}
                     </div>

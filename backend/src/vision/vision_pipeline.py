@@ -10,6 +10,7 @@ vision_severity in Umaima's segment JSON.
 import glob
 import os
 import random
+from math import cos, radians
 from pathlib import Path
 
 import requests
@@ -17,9 +18,9 @@ import requests
 from src.vision.detect import load_model, detect_damage, severity_from_detections
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
-MAPILLARY_TOKEN = os.getenv("MAPILLARY_TOKEN")
+MAPILLARY_TOKEN = os.getenv("MAPILLARY_TOKEN") or os.getenv("MAPILLARY_ACCESS_TOKEN")
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 FALLBACK_IMAGES = glob.glob(str(BACKEND_DIR / "data" / "india_subset" / "test" / "images" / "*.jpg"))
 
@@ -33,12 +34,16 @@ def get_street_image_near(lat: float, lon: float, radius: int = 50):
 
     url = "https://graph.mapillary.com/images"
 
+    if not MAPILLARY_TOKEN:
+        return None
+    # Mapillary's images endpoint accepts a longitude/latitude bounding box;
+    # lat/lng/radius are not valid lookup parameters and silently produced no coverage.
+    lat_delta = radius / 111_320
+    lon_delta = radius / (111_320 * max(abs(cos(radians(lat))), 0.1))
     params = {
         "access_token": MAPILLARY_TOKEN,
         "fields": "id,thumb_1024_url",
-        "lat": lat,
-        "lng": lon,
-        "radius": radius,
+        "bbox": f"{lon-lon_delta},{lat-lat_delta},{lon+lon_delta},{lat+lat_delta}",
         "limit": 1,
     }
 
