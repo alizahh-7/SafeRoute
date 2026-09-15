@@ -1,5 +1,6 @@
 //frontend/src/components/SegmentDetailDrawer.tsx
-import { X, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { X, AlertTriangle, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { RouteSegment } from "../types/route";
 import SegmentRiskBadge from "./SegmentRiskBadge";
@@ -11,7 +12,12 @@ interface Props {
   onClose: () => void;
 }
 
+const DRAWER_WIDTH_NORMAL = "420px";
+const DRAWER_WIDTH_EXPANDED = "760px";
+
 const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <AnimatePresence>
       {segment && (
@@ -26,18 +32,29 @@ const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
             className="drawer-panel" 
             onClick={(e) => e.stopPropagation()}
             initial={{ x: "100%" }}
-            animate={{ x: 0 }}
+            animate={{ x: 0, width: expanded ? DRAWER_WIDTH_EXPANDED : DRAWER_WIDTH_NORMAL }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            style={{ maxWidth: "94vw" }}
           >
             <div className="drawer-header flex justify-between items-center">
               <div>
                 <h3 className="drawer-title">{segment.road_name}</h3>
                 <p className="text-muted" style={{ fontSize: '0.875rem' }}>Segment ID: {segment.segment_id}</p>
               </div>
-              <button className="btn-icon" onClick={onClose}>
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  className="btn-icon"
+                  onClick={() => setExpanded((prev) => !prev)}
+                  aria-label={expanded ? "Collapse panel" : "Expand panel"}
+                  title={expanded ? "Collapse panel" : "Expand panel"}
+                >
+                  {expanded ? <ChevronsRight size={22} /> : <ChevronsLeft size={22} />}
+                </button>
+                <button className="btn-icon" onClick={onClose}>
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             <div className="drawer-content">
@@ -85,10 +102,10 @@ const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
                     <span className="font-semibold">Road Damage Detected</span>
                   </div>
                   
-                  <div className="damage-info flex gap-4 mt-4">
+                  <div className={`damage-info flex gap-4 mt-4 ${expanded ? "flex-row" : "flex-col sm:flex-row"}`}>
                     {segment.image_url && (
-                      <div className="damage-thumbnail-wrapper">
-                        <RoadDamageImage src={segment.image_url} alt="Road damage detection source" className="aspect-[4/3] w-32">
+                      <div className="damage-thumbnail-wrapper" style={expanded ? { width: "220px", flexShrink: 0 } : undefined}>
+                        <RoadDamageImage src={segment.image_url} alt="Road damage detection source" className={expanded ? "aspect-[4/3] w-full" : "aspect-[4/3] w-32"}>
                         {segment.vision_source === "rdd2022_sample" && (
                           <span className="sample-label">Sample Image</span>
                         )}
