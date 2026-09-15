@@ -20,6 +20,7 @@ interface RouteContextValue {
 }
 
 const SESSION_STATS_KEY = "saferoute-session-stats";
+const ROUTE_STATE_KEY = "saferoute-route-state";
 
 type SessionStats = {
   routesAnalyzed: number;
@@ -42,12 +43,23 @@ function getPersistedSessionStats(): SessionStats {
   }
 }
 
+function getPersistedRouteState() {
+  try {
+    const saved = localStorage.getItem(ROUTE_STATE_KEY);
+    if (!saved) return null;
+    return JSON.parse(saved) as { origin: string; destination: string; routeData: RouteRiskResponse | null };
+  } catch {
+    return null;
+  }
+}
+
 const RouteContext = createContext<RouteContextValue | undefined>(undefined);
 
 export function RouteProvider({ children }: { children: ReactNode }) {
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
-  const [routeData, setRouteData] = useState<RouteRiskResponse | null>(null);
+  const persisted = getPersistedRouteState();
+  const [origin, setOrigin] = useState(persisted?.origin ?? "");
+  const [destination, setDestination] = useState(persisted?.destination ?? "");
+  const [routeData, setRouteData] = useState<RouteRiskResponse | null>(persisted?.routeData ?? null);
   const [alternateData, setAlternateData] = useState<AlternateRouteResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [alternateLoading, setAlternateLoading] = useState(false);
@@ -56,9 +68,13 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   const [hazardsFlagged, setHazardsFlagged] = useState(() => getPersistedSessionStats().hazardsFlagged);
   const [reroutesAccepted, setReroutesAccepted] = useState(() => getPersistedSessionStats().reroutesAccepted);
 
-  useEffect(() => {
+    useEffect(() => {
     localStorage.setItem(SESSION_STATS_KEY, JSON.stringify({ routesAnalyzed, hazardsFlagged, reroutesAccepted }));
   }, [routesAnalyzed, hazardsFlagged, reroutesAccepted]);
+
+  useEffect(() => {
+    localStorage.setItem(ROUTE_STATE_KEY, JSON.stringify({ origin, destination, routeData }));
+  }, [origin, destination, routeData]);
 
   const planRoute = useCallback(async (newOrigin: string, newDestination: string) => {
     setLoading(true);

@@ -51,7 +51,7 @@ export default function CapstoneTeamShowcase() {
             <div className="lg:col-span-4 p-space-lg rounded-[1.75rem] bg-surface-container-lowest border border-surface-variant">
               <span className="font-label-caps-micro uppercase">Project status</span>
               <b className="block text-2xl mt-space-xs">Submission ready</b>
-              <span className="font-body-sm text-secondary">Backend and frontend fully wired to real data</span>
+              <span className="font-body-sm text-secondary">Backend and frontend fully wired to real data Backend and frontend wired to real data — known limitations documented</span>
             </div>
           </div>
           <div className="mt-space-lg p-space-md rounded-xl bg-surface-container-low flex flex-wrap gap-space-sm items-center">

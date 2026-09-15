@@ -57,22 +57,35 @@ export interface LocationSuggestion { label: string; lat: number; lon: number; }
 
 export const fetchLocationSuggestions = async (query: string): Promise<LocationSuggestion[]> => {
   if (query.trim().length < 3) return [];
-  const response = await fetch(`${API_BASE_URL}/location-suggestions?q=${encodeURIComponent(query)}`);
-  if (!response.ok) return [];
-  const data = await response.json();
-  return data.suggestions ?? [];
+  try {
+    const response = await fetch(`${API_BASE_URL}/location-suggestions?q=${encodeURIComponent(query)}`);
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.suggestions ?? [];
+  } catch {
+    return [];
+  }
 };
 
 export const reverseGeocodeLocation = async (lat: number, lon: number): Promise<string> => {
-  const response = await fetch(`${API_BASE_URL}/reverse-geocode?lat=${lat}&lon=${lon}`);
-  if (!response.ok) throw new ApiError("Could not determine your location name.");
-  const data = await response.json();
-  return data.label;
+  try {
+    const response = await fetch(`${API_BASE_URL}/reverse-geocode?lat=${lat}&lon=${lon}`);
+    if (!response.ok) throw new ApiError("Could not determine your location name.");
+    const data = await response.json();
+    return data.label;
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    throw new ApiError("Could not reach the server to determine your location name.");
+  }
 };
 
 export const fetchCityNews = async (): Promise<string[]> => {
-  const response = await fetch(`${API_BASE_URL}/city-news`);
-  if (!response.ok) return [];
-  const data = await response.json();
-  return data.headlines ?? [];
+  try {
+    const response = await fetch(`${API_BASE_URL}/city-news`);
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.headlines ?? [];
+  } catch {
+    return [];
+  }
 };
