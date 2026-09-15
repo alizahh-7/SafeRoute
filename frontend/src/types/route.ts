@@ -50,3 +50,30 @@ export interface AlternateRouteResponse {
   primary_segments?: RouteSegment[];
   alternate_segments?: RouteSegment[] | null;
 }
+
+export type RiskCategory = "low" | "moderate" | "high" | "severe";
+
+export interface SafetySnapshot {
+  id: string;
+  checkedAt: string;
+  route: RouteRiskResponse;
+  riskCategory: RiskCategory;
+  activeSignals: number;
+  highestRiskSegmentId: string | null;
+  weatherState: "clear" | "caution" | "unavailable";
+  trafficState: TrafficLevel | "mixed";
+  waterloggingActive: boolean;
+  newsCount: number;
+  visionDetections: number;
+}
+
+export interface SavedCommute {
+  id: string;
+  name: string;
+  origin: string;
+  destination: string;
+  favorite: boolean;
+  recurring: boolean;
+  createdAt: string;
+  snapshots: SafetySnapshot[];
+}
