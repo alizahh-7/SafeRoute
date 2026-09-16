@@ -6,7 +6,6 @@ import RoutePlanner from "./pages/RoutePlanner";
 import RouteResults from "./pages/RouteResults";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
-import About from "./pages/About";
 import { SegmentDiagnostics } from "./pages/SegmentAIDiagnosticsRiskBreakdown";
 import RealTimeHazardRerouteAdvisory from "./pages/RealTimeHazardRerouteAdvisory";
 import LiveAnalyticsRiskHeatmap from "./pages/LiveAnalyticsRiskHeatmap";
@@ -23,7 +22,6 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/route-planner" element={<RoutePlanner />} />
           <Route path="/route" element={<RouteResults />} />
-          <Route path="/about" element={<About />} />
           <Route path="/segment/:segmentId" element={<SegmentDiagnostics />} />
           <Route path="/hazard-advisory" element={<RealTimeHazardRerouteAdvisory />} />
           <Route path="/analytics" element={<LiveAnalyticsRiskHeatmap />} />

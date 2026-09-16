@@ -30,7 +30,6 @@ const Footer = () => {
               <span className="font-label-caps-micro text-label-caps-micro uppercase text-on-surface tracking-wider">Institutional Research</span>
               <Link to="/methodology" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">Model Architecture</Link>
               <Link to="/capstone-showcase" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">Capstone Investigators</Link>
-              <Link to="/about" className="font-body-sm text-body-sm hover:text-on-surface transition-colors">How SafeRoute Works</Link>
               <span className="font-body-sm text-body-sm text-outline-variant">AICW Cohort 2024</span>
             </div>
             <div className="flex flex-col gap-space-sm">
