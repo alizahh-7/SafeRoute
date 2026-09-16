@@ -80,6 +80,7 @@ const age = (time: string) => {
     0,
     Math.floor((Date.now() - new Date(time).getTime()) / 60000),
   );
+
   if (minutes < 1) return "just now";
   if (minutes < 60) return `${minutes} min ago`;
   if (minutes < 1440) return `${Math.floor(minutes / 60)} hr ago`;
@@ -128,7 +129,8 @@ function explainDelta(curr: RouteSegment, prev: RouteSegment): string {
       label: `Traffic ${prev.traffic_level} → ${curr.traffic_level}`,
       weight:
         Math.abs(
-          TRAFFIC_RANK[curr.traffic_level] - TRAFFIC_RANK[prev.traffic_level],
+          TRAFFIC_RANK[curr.traffic_level] -
+            TRAFFIC_RANK[prev.traffic_level],
         ) * 6,
     });
   }
@@ -138,7 +140,8 @@ function explainDelta(curr: RouteSegment, prev: RouteSegment): string {
       label: `Road surface ${prev.vision_severity} → ${curr.vision_severity}`,
       weight:
         Math.abs(
-          VISION_RANK[curr.vision_severity] - VISION_RANK[prev.vision_severity],
+          VISION_RANK[curr.vision_severity] -
+            VISION_RANK[prev.vision_severity],
         ) *
           6 +
         2,
@@ -166,6 +169,7 @@ function explainDelta(curr: RouteSegment, prev: RouteSegment): string {
 
   const currNews = curr.news_flags?.length ?? 0;
   const prevNews = prev.news_flags?.length ?? 0;
+
   if (currNews !== prevNews) {
     reasons.push({
       label:
@@ -177,45 +181,71 @@ function explainDelta(curr: RouteSegment, prev: RouteSegment): string {
   }
 
   if (!reasons.length) return "No single signal drove the change";
+
   return reasons.sort((a, b) => b.weight - a.weight)[0].label;
 }
 
 function segmentDiffs(curr: SafetySnapshot, prev: SafetySnapshot) {
   const prevById = new Map(prev.route.segments.map((s) => [s.segment_id, s]));
+  const prevByRoad = new Map(
+    prev.route.segments.map((s) => [s.road_name, s]),
+  );
 
   return curr.route.segments
-    .map((segment) => {
-      const before = prevById.get(segment.segment_id);
+    .map((segment, i) => {
+      const before =
+        prevById.get(segment.segment_id) ??
+        prevByRoad.get(segment.road_name) ??
+        prev.route.segments[i];
+
       if (!before) return null;
 
       const delta =
         Math.round((segment.final_score - before.final_score) * 10) / 10;
+
       if (delta === 0) return null;
 
-      return { segment, delta, reason: explainDelta(segment, before) };
+      return {
+        segment,
+        delta,
+        reason: explainDelta(segment, before),
+      };
     })
     .filter(
-      (item): item is { segment: RouteSegment; delta: number; reason: string } =>
-        item !== null,
+      (
+        item,
+      ): item is {
+        segment: RouteSegment;
+        delta: number;
+        reason: string;
+      } => item !== null,
     )
     .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
 }
 
-/** Data-derived category tag for a corridor card — no fabricated fields. */
-function corridorTag(commute: SavedCommute, snapshot: SafetySnapshot | null) {
+function corridorTag(
+  commute: SavedCommute,
+  snapshot: SafetySnapshot | null,
+) {
   if (snapshot?.waterloggingActive)
     return { label: "Active monsoon advisory", tone: P.orange };
+
   if (snapshot && snapshot.route.route_total_risk >= 75)
     return { label: "High cautionary corridor", tone: P.red };
+
   if (commute.favorite)
     return { label: "Priority corridor", tone: P.accentDeep };
+
   if (commute.recurring)
     return { label: "Recurring corridor", tone: P.green };
+
   return { label: "Saved corridor", tone: P.inkSoft };
 }
 
 /* ---------------------------------------------------------- */
 /* Small presentational pieces                                 */
+/* Typography now uses the same design-system font utilities   */
+/* as Home.tsx throughout SafeRoute.                           */
 /* ---------------------------------------------------------- */
 
 function StatTile({
@@ -231,32 +261,38 @@ function StatTile({
 }) {
   return (
     <div
-      className="rounded-2xl border p-5"
+      className="rounded-2xl border p-space-lg"
       style={{ borderColor: P.line, background: P.surface }}
     >
       <p
-        className="text-[10px] font-medium uppercase tracking-[0.14em]"
+        className="font-label-caps-micro text-label-caps-micro uppercase"
         style={{ color: P.inkSoft }}
       >
         {label}
       </p>
-      <div className="mt-3 flex items-baseline gap-2">
+
+      <div className="mt-space-sm flex items-baseline gap-space-2xs">
         <span
-          className="text-3xl font-semibold tracking-tight"
+          className="font-headline-md text-headline-md font-semibold tracking-tight"
           style={{ color: P.ink }}
         >
           {value}
         </span>
+
         {trend && (
           <span
-            className="text-xs font-medium"
+            className="font-body-sm text-body-sm font-medium"
             style={{ color: trend.positive ? P.green : P.red }}
           >
             {trend.text}
           </span>
         )}
       </div>
-      <p className="mt-1 text-xs" style={{ color: P.inkSoft }}>
+
+      <p
+        className="mt-space-2xs font-body-sm text-body-sm"
+        style={{ color: P.inkSoft }}
+      >
         {sub}
       </p>
     </div>
@@ -278,7 +314,7 @@ function PillTab({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full border px-4 py-1.5 text-xs font-medium transition-colors"
+      className="rounded-full border px-space-md py-space-xs font-label-caps-micro text-label-caps-micro uppercase font-bold transition-colors"
       style={
         active
           ? { background: P.ink, borderColor: P.ink, color: P.surface }
@@ -323,33 +359,46 @@ function CorridorCard({
 
   const highest =
     snapshot?.route.segments.reduce<RouteSegment | null>(
-      (best, seg) => (!best || seg.final_score > best.final_score ? seg : best),
+      (best, seg) =>
+        !best || seg.final_score > best.final_score ? seg : best,
       null,
     ) ?? null;
 
   const topChange =
     snapshot && previous ? segmentDiffs(snapshot, previous)[0] ?? null : null;
 
+  const overallDelta =
+    snapshot && previous
+      ? Math.round(
+          (snapshot.route.route_total_risk -
+            previous.route.route_total_risk) *
+            10,
+        ) / 10
+      : null;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.35 }}
-      className="rounded-[1.75rem] border p-6"
+      className="rounded-[1.75rem] border p-space-lg"
       style={{ borderColor: P.line, background: P.surface }}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-space-sm">
         <span
-          className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-medium uppercase tracking-[0.12em]"
+          className="inline-flex items-center gap-space-2xs rounded-full px-space-sm py-space-2xs font-label-caps-micro text-label-caps-micro uppercase"
           style={{ background: `${tag.tone}1A`, color: tag.tone }}
         >
-          <span className="size-1.5 rounded-full" style={{ background: tag.tone }} />
+          <span
+            className="size-1.5 rounded-full"
+            style={{ background: tag.tone }}
+          />
           {tag.label}
         </span>
 
         {snapshot && (
           <span
-            className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
+            className="inline-flex items-center gap-space-2xs rounded-full border px-space-sm py-space-2xs font-label-code-md text-label-code-md font-semibold"
             style={{
               borderColor: riskTone(snapshot.route.route_total_risk),
               color: riskTone(snapshot.route.route_total_risk),
@@ -357,122 +406,236 @@ function CorridorCard({
           >
             <span
               className="size-1.5 rounded-full"
-              style={{ background: riskTone(snapshot.route.route_total_risk) }}
+              style={{
+                background: riskTone(snapshot.route.route_total_risk),
+              }}
             />
-            {snapshot.route.route_total_risk} / 100 · {riskName(snapshot.route.route_total_risk)}
+            {snapshot.route.route_total_risk} / 100 ·{" "}
+            {riskName(snapshot.route.route_total_risk)}
           </span>
         )}
       </div>
 
       {renaming ? (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-space-md flex flex-wrap gap-space-2xs">
           <input
             autoFocus
             value={nameDraft}
             onChange={(e) => onNameDraftChange(e.target.value)}
-            className="min-w-[220px] flex-1 rounded-xl border px-3 py-2 text-lg outline-none"
+            className="min-w-[220px] flex-1 rounded-xl border px-space-sm py-space-xs font-body-md text-body-md outline-none"
             style={{ borderColor: P.line, color: P.ink }}
           />
+
           <button
             type="button"
             onClick={onRenameCommit}
-            className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium"
+            className="inline-flex items-center gap-space-2xs rounded-xl px-space-sm py-space-xs font-body-sm text-body-sm font-medium"
             style={{ background: P.ink, color: P.surface }}
           >
-            <Check size={14} />
+            <Check size={16} />
             Save
           </button>
         </div>
       ) : (
         <h3
-          className="mt-4 text-xl font-semibold leading-snug tracking-tight"
+          className="mt-space-md font-headline-sm text-headline-sm font-medium tracking-tight"
           style={{ color: P.ink }}
         >
           {commute.name}
         </h3>
       )}
 
-      <p className="mt-1 flex items-center gap-1.5 text-sm" style={{ color: P.inkSoft }}>
-        <MapPinned size={13} />
+      <p
+        className="mt-space-2xs flex items-center gap-space-2xs font-body-sm text-body-sm"
+        style={{ color: P.inkSoft }}
+      >
+        <MapPinned size={15} />
         {commute.origin} → {commute.destination}
       </p>
 
       {snapshot ? (
         <>
           <div
-            className="mt-5 grid grid-cols-3 gap-3 rounded-2xl p-4 text-xs"
+            className="mt-space-md grid grid-cols-3 gap-space-sm rounded-2xl p-space-md font-body-sm text-body-sm"
             style={{ background: P.surfaceAlt }}
           >
             <div>
-              <p className="uppercase tracking-[0.1em]" style={{ color: P.inkFaint }}>
+              <p
+                className="font-label-caps-micro text-label-caps-micro uppercase"
+                style={{ color: P.inkFaint }}
+              >
                 Checked
               </p>
-              <p className="mt-1 font-medium" style={{ color: P.ink }}>
+              <p
+                className="mt-space-2xs font-body-sm text-body-sm font-medium"
+                style={{ color: P.ink }}
+              >
                 {age(snapshot.checkedAt)}
               </p>
             </div>
+
             <div>
-              <p className="uppercase tracking-[0.1em]" style={{ color: P.inkFaint }}>
+              <p
+                className="font-label-caps-micro text-label-caps-micro uppercase"
+                style={{ color: P.inkFaint }}
+              >
                 Signals
               </p>
-              <p className="mt-1 font-medium" style={{ color: P.ink }}>
+              <p
+                className="mt-space-2xs font-body-sm text-body-sm font-medium"
+                style={{ color: P.ink }}
+              >
                 {snapshot.activeSignals} active
               </p>
             </div>
+
             <div>
-              <p className="uppercase tracking-[0.1em]" style={{ color: P.inkFaint }}>
+              <p
+                className="font-label-caps-micro text-label-caps-micro uppercase"
+                style={{ color: P.inkFaint }}
+              >
                 Highest risk
               </p>
-              <p className="mt-1 truncate font-medium" style={{ color: P.ink }}>
-                {highest ? `${highest.road_name}` : "—"}
+              <p
+                className="mt-space-2xs truncate font-body-sm text-body-sm font-medium"
+                style={{ color: P.ink }}
+              >
+                {highest ? highest.road_name : "—"}
               </p>
             </div>
           </div>
 
           {snapshot.waterloggingActive ? (
             <div
-              className="mt-4 flex gap-3 rounded-2xl border p-4"
-              style={{ borderColor: `${P.orange}33`, background: `${P.orange}10` }}
+              className="mt-space-sm flex gap-space-sm rounded-2xl border p-space-md"
+              style={{
+                borderColor: `${P.orange}33`,
+                background: `${P.orange}10`,
+              }}
             >
-              <AlertTriangle size={16} className="mt-0.5 shrink-0" style={{ color: P.orange }} />
-              <p className="text-xs leading-5" style={{ color: P.ink }}>
-                <span className="font-semibold">Waterlogging signal active.</span>{" "}
-                This corridor is showing standing-water risk on the latest check —
-                consider reviewing an alternate before departure.
+              <AlertTriangle
+                size={18}
+                className="mt-0.5 shrink-0"
+                style={{ color: P.orange }}
+              />
+              <p
+                className="font-body-sm text-body-sm leading-relaxed"
+                style={{ color: P.ink }}
+              >
+                <span className="font-semibold">
+                  Waterlogging signal active.
+                </span>{" "}
+                This corridor is showing standing-water risk on the latest
+                check — consider reviewing an alternate before departure.
               </p>
             </div>
           ) : topChange && Math.abs(topChange.delta) >= 3 ? (
             <div
-              className="mt-4 flex items-start justify-between gap-3 rounded-2xl border p-4"
-              style={{ borderColor: P.line, background: P.surfaceAlt }}
+              className="mt-space-sm flex items-start justify-between gap-space-sm rounded-2xl border p-space-md"
+              style={{
+                borderColor: P.line,
+                background: P.surfaceAlt,
+              }}
             >
-              <div className="flex gap-3">
-                <ShieldCheck size={16} className="mt-0.5 shrink-0" style={{ color: P.accentDeep }} />
+              <div className="flex gap-space-sm">
+                <ShieldCheck
+                  size={18}
+                  className="mt-0.5 shrink-0"
+                  style={{ color: P.accentDeep }}
+                />
+
                 <div>
-                  <p className="text-xs font-medium" style={{ color: P.ink }}>
+                  <p
+                    className="font-body-sm text-body-sm font-medium"
+                    style={{ color: P.ink }}
+                  >
                     {topChange.segment.road_name}
                   </p>
-                  <p className="mt-0.5 text-xs leading-5" style={{ color: P.inkSoft }}>
+
+                  <p
+                    className="mt-0.5 font-body-sm text-body-sm leading-relaxed"
+                    style={{ color: P.inkSoft }}
+                  >
                     {topChange.reason}
                   </p>
                 </div>
               </div>
+
               <span
-                className="flex shrink-0 items-center gap-1 text-sm font-semibold"
-                style={{ color: topChange.delta > 0 ? P.red : P.green }}
+                className="flex shrink-0 items-center gap-1 font-body-md text-body-md font-semibold"
+                style={{
+                  color: topChange.delta > 0 ? P.red : P.green,
+                }}
               >
-                {topChange.delta > 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                {topChange.delta > 0 ? (
+                  <ArrowUpRight size={16} />
+                ) : (
+                  <ArrowDownRight size={16} />
+                )}
                 {topChange.delta > 0 ? "+" : ""}
                 {topChange.delta}
               </span>
             </div>
+          ) : overallDelta !== null && Math.abs(overallDelta) >= 3 ? (
+            <div
+              className="mt-space-sm flex items-start justify-between gap-space-sm rounded-2xl border p-space-md"
+              style={{
+                borderColor: P.line,
+                background: P.surfaceAlt,
+              }}
+            >
+              <div className="flex gap-space-sm">
+                {overallDelta > 0 ? (
+                  <ArrowUpRight
+                    size={18}
+                    className="mt-0.5 shrink-0"
+                    style={{ color: P.red }}
+                  />
+                ) : (
+                  <ArrowDownRight
+                    size={18}
+                    className="mt-0.5 shrink-0"
+                    style={{ color: P.green }}
+                  />
+                )}
+
+                <p
+                  className="font-body-sm text-body-sm leading-relaxed"
+                  style={{ color: P.ink }}
+                >
+                  Overall risk {overallDelta > 0 ? "rose" : "eased"} by{" "}
+                  {Math.abs(overallDelta)} points since the last check.
+                </p>
+              </div>
+
+              <span
+                className="flex shrink-0 items-center gap-1 font-body-md text-body-md font-semibold"
+                style={{
+                  color: overallDelta > 0 ? P.red : P.green,
+                }}
+              >
+                {overallDelta > 0 ? "+" : ""}
+                {overallDelta}
+              </span>
+            </div>
           ) : (
             <div
-              className="mt-4 flex gap-3 rounded-2xl border p-4"
-              style={{ borderColor: P.line, background: P.surfaceAlt }}
+              className="mt-space-sm flex gap-space-sm rounded-2xl border p-space-md"
+              style={{
+                borderColor: P.line,
+                background: P.surfaceAlt,
+              }}
             >
-              <ShieldCheck size={16} className="mt-0.5 shrink-0" style={{ color: P.green }} />
-              <p className="text-xs leading-5" style={{ color: P.inkSoft }}>
+              <ShieldCheck
+                size={18}
+                className="mt-0.5 shrink-0"
+                style={{ color: P.green }}
+              />
+
+              <p
+                className="font-body-sm text-body-sm leading-relaxed"
+                style={{ color: P.inkSoft }}
+              >
                 No meaningful change since the last check — this corridor is
                 behaving consistently.
               </p>
@@ -481,62 +644,72 @@ function CorridorCard({
         </>
       ) : (
         <div
-          className="mt-5 rounded-2xl border p-4 text-xs leading-5"
-          style={{ borderColor: P.line, background: P.surfaceAlt, color: P.inkSoft }}
+          className="mt-space-md rounded-2xl border p-space-md font-body-sm text-body-sm leading-relaxed"
+          style={{
+            borderColor: P.line,
+            background: P.surfaceAlt,
+            color: P.inkSoft,
+          }}
         >
-          No safety check recorded yet. Run “Check now” to establish a baseline.
+          No safety check recorded yet. Run “Check now” to establish a
+          baseline.
         </div>
       )}
 
-      <div className="mt-5 flex flex-wrap items-center gap-2">
+      <div className="mt-space-md flex flex-wrap items-center gap-space-2xs">
         <button
           type="button"
           disabled={checking}
           onClick={onCheck}
-          className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+          className="inline-flex items-center gap-space-xs rounded-xl px-space-md py-space-sm font-body-sm text-body-sm font-medium disabled:opacity-50"
           style={{ background: P.ink, color: P.surface }}
         >
-          <RefreshCw size={14} className={checking ? "animate-spin" : ""} />
+          <RefreshCw
+            size={16}
+            className={checking ? "animate-spin" : ""}
+          />
           {checking ? "Checking…" : "Check now"}
         </button>
 
         <button
           type="button"
           onClick={onOpen}
-          className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium"
+          className="inline-flex items-center gap-space-xs rounded-xl border px-space-md py-space-sm font-body-sm text-body-sm font-medium"
           style={{ borderColor: P.line, color: P.ink }}
         >
-          <MapPinned size={14} />
+          <MapPinned size={16} />
           Open route
         </button>
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-space-2xs">
           <button
             type="button"
             title="Rename"
             onClick={onRenameStart}
-            className="rounded-lg p-2 transition-colors hover:bg-black/5"
+            className="rounded-lg p-space-xs transition-colors hover:bg-black/5"
             style={{ color: P.inkSoft }}
           >
-            <Pencil size={15} />
+            <Pencil size={17} />
           </button>
+
           <button
             type="button"
             title="Export safety report"
             onClick={onExport}
-            className="rounded-lg p-2 transition-colors hover:bg-black/5"
+            className="rounded-lg p-space-xs transition-colors hover:bg-black/5"
             style={{ color: P.inkSoft }}
           >
-            <Download size={15} />
+            <Download size={17} />
           </button>
+
           <button
             type="button"
             title="Delete"
             onClick={onDelete}
-            className="rounded-lg p-2 transition-colors hover:bg-black/5"
+            className="rounded-lg p-space-xs transition-colors hover:bg-black/5"
             style={{ color: P.red }}
           >
-            <Trash2 size={15} />
+            <Trash2 size={17} />
           </button>
         </div>
       </div>
@@ -571,32 +744,53 @@ export default function SavedCorridorsCommuteArchive() {
     document.title = "Saved Commutes | SafeRoute Telangana";
   }, []);
 
-  const counts = useMemo(
-    () => ({
-      all: savedCommutes.length,
-      favorites: savedCommutes.filter((c) => c.favorite).length,
-      recurring: savedCommutes.filter((c) => c.recurring).length,
-      elevated: savedCommutes.filter(
-        (c) => (latest(c)?.route.route_total_risk ?? 0) >= 50,
-      ).length,
-    }),
-    [savedCommutes],
-  );
+const counts = useMemo(
+  () => ({
+    all: savedCommutes.length,
+    favorites: savedCommutes.filter((c) => c.favorite).length,
+    recurring: savedCommutes.filter((c) => c.recurring).length,
+    elevated: savedCommutes.filter((c) => {
+      const current = latest(c);
+      const previous = previousOf(c);
 
-  const visibleCommutes = useMemo(() => {
-    switch (filter) {
-      case "favorites":
-        return savedCommutes.filter((c) => c.favorite);
-      case "recurring":
-        return savedCommutes.filter((c) => c.recurring);
-      case "elevated":
-        return savedCommutes.filter(
-          (c) => (latest(c)?.route.route_total_risk ?? 0) >= 50,
+      if (!current || !previous) return false;
+
+      return (
+        current.route.route_total_risk -
+          previous.route.route_total_risk >=
+        3
+      );
+    }).length,
+  }),
+  [savedCommutes],
+);
+
+const visibleCommutes = useMemo(() => {
+  switch (filter) {
+    case "favorites":
+      return savedCommutes.filter((c) => c.favorite);
+
+    case "recurring":
+      return savedCommutes.filter((c) => c.recurring);
+
+    case "elevated":
+      return savedCommutes.filter((c) => {
+        const current = latest(c);
+        const previous = previousOf(c);
+
+        if (!current || !previous) return false;
+
+        return (
+          current.route.route_total_risk -
+            previous.route.route_total_risk >=
+          3
         );
-      default:
-        return savedCommutes;
-    }
-  }, [savedCommutes, filter]);
+      });
+
+    default:
+      return savedCommutes;
+  }
+}, [savedCommutes, filter]);
 
   const snapshotsWithCommute = useMemo(
     () =>
@@ -649,14 +843,22 @@ export default function SavedCorridorsCommuteArchive() {
     score: number;
   } | null>((best, c) => {
     const score = latest(c)?.route.route_total_risk;
+
     if (score === undefined) return best;
-    return !best || score > best.score ? { commute: c, score } : best;
+
+    return !best || score > best.score
+      ? { commute: c, score }
+      : best;
   }, null);
 
-  const totalChecks = savedCommutes.reduce((s, c) => s + c.snapshots.length, 0);
+  const totalChecks = savedCommutes.reduce(
+    (s, c) => s + c.snapshots.length,
+    0,
+  );
 
   const checkNow = async (id: string) => {
     setCheckingId(id);
+
     try {
       await refreshSavedCommute(id);
     } finally {
@@ -690,7 +892,9 @@ export default function SavedCorridorsCommuteArchive() {
 
   const exportCommute = (commute: SavedCommute) => {
     const snap = latest(commute);
+
     if (!snap) return;
+
     downloadSafetyReport(
       commute.origin,
       commute.destination,
@@ -701,46 +905,65 @@ export default function SavedCorridorsCommuteArchive() {
 
   const exportAudit = () => {
     const target = visibleCommutes[0] ?? savedCommutes[0];
+
     if (target) exportCommute(target);
   };
 
   if (!savedCommutes.length) {
     return (
-      <div className="min-h-screen pt-20" style={{ background: P.bg }}>
-        <div className={`${shell} py-24`}>
+      <div
+        className="min-h-screen pt-20"
+        style={{ background: P.bg }}
+      >
+        <div className={`${shell} py-space-3xl`}>
           <section
-            className="mx-auto max-w-2xl overflow-hidden rounded-[2rem] border p-12 text-center"
-            style={{ borderColor: P.line, background: P.surface }}
+            className="mx-auto max-w-2xl overflow-hidden rounded-[2rem] border p-space-2xl text-center"
+            style={{
+              borderColor: P.line,
+              background: P.surface,
+            }}
           >
             <div
               className="mx-auto flex size-16 items-center justify-center rounded-2xl"
-              style={{ background: P.accent, color: P.ink }}
+              style={{
+                background: P.accent,
+                color: P.ink,
+              }}
             >
               <Bookmark size={28} />
             </div>
 
             <p
-              className="mt-7 text-[10px] uppercase tracking-[0.2em]"
+              className="mt-space-lg font-label-caps-micro text-label-caps-micro uppercase"
               style={{ color: P.accentDeep }}
             >
               Commute intelligence
             </p>
 
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight" style={{ color: P.ink }}>
+            <h1
+              className="mt-space-xs font-display-hero text-display-hero text-on-surface font-medium tracking-tight"
+              style={{ color: P.ink }}
+            >
               Nothing saved yet.
             </h1>
 
-            <p className="mx-auto mt-5 max-w-lg leading-7" style={{ color: P.inkSoft }}>
+            <p
+              className="mx-auto mt-space-md max-w-lg font-body-lg text-body-lg leading-relaxed"
+              style={{ color: P.inkSoft }}
+            >
               Save a route you travel regularly and SafeRoute will retain its
               safety checks so you can see how that corridor changes over time.
             </p>
 
             <Link
               to="/route-planner"
-              className="mt-8 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-medium"
-              style={{ background: P.accent, color: P.ink }}
+              className="mt-space-lg inline-flex items-center gap-space-xs rounded-full px-space-xl py-space-md font-headline-sm text-headline-sm"
+              style={{
+                background: P.accent,
+                color: P.ink,
+              }}
             >
-              <Route size={16} />
+              <Route size={18} />
               Plan a route
             </Link>
           </section>
@@ -750,87 +973,140 @@ export default function SavedCorridorsCommuteArchive() {
   }
 
   return (
-    <div className="min-h-screen pb-24 pt-20" style={{ background: P.bg }}>
+    <div
+      className="min-h-screen pb-space-3xl pt-20"
+      style={{ background: P.bg }}
+    >
       <div className={shell}>
         {/* EYEBROW */}
-        <div className="flex flex-wrap items-center gap-3 pt-2 pb-6">
+        <div className="flex flex-wrap items-center gap-space-xs pb-space-lg pt-space-2xs">
           <span
-            className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em]"
-            style={{ borderColor: P.line, color: P.accentDeep, background: P.surface }}
+            className="inline-flex items-center gap-space-2xs rounded-full border px-space-sm py-space-xs font-label-caps-micro text-label-caps-micro uppercase"
+            style={{
+              borderColor: P.line,
+              color: P.accentDeep,
+              background: P.surface,
+            }}
           >
-            <span className="size-1.5 rounded-full" style={{ background: P.accent }} />
+            <span
+              className="size-1.5 rounded-full"
+              style={{ background: P.accent }}
+            />
             Commute AI engine active
           </span>
-          <span className="text-[10px] uppercase tracking-[0.16em]" style={{ color: P.inkFaint }}>
+
+          <span
+            className="font-label-caps-micro text-label-caps-micro uppercase"
+            style={{ color: P.inkFaint }}
+          >
             Personal road-safety intelligence
           </span>
         </div>
 
         {/* HEADER */}
         <header
-          className="flex flex-col gap-7 border-b pb-10 lg:flex-row lg:items-end lg:justify-between"
+          className="flex flex-col gap-space-lg border-b pb-space-xl lg:flex-row lg:items-end lg:justify-between"
           style={{ borderColor: P.line }}
         >
           <div>
             <h1
-              className="max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] md:text-5xl"
+              className="max-w-3xl font-display-hero text-display-hero text-on-surface tracking-tight font-medium"
               style={{ color: P.ink }}
             >
               Monitored Commutes &{" "}
-              <span className="font-serif italic" style={{ color: P.accent }}>
+              <span
+                className="font-serif italic"
+                style={{ color: P.accent }}
+              >
                 Route Guardians
               </span>
             </h1>
 
-            <p className="mt-4 max-w-2xl text-base leading-7" style={{ color: P.inkSoft }}>
+            <p
+              className="mt-space-md max-w-2xl font-body-lg text-body-lg leading-relaxed"
+              style={{ color: P.inkSoft }}
+            >
               Your recurring corridors, continuously re-checkable against the
               latest available safety signals.
             </p>
           </div>
 
-          <div className="flex shrink-0 flex-wrap gap-3">
+          <div className="flex shrink-0 flex-wrap gap-space-xs">
             <button
               type="button"
               onClick={exportAudit}
-              className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium"
-              style={{ borderColor: P.line, color: P.ink, background: P.surface }}
+              className="inline-flex items-center gap-space-xs rounded-xl border px-space-md py-space-sm font-headline-sm text-headline-sm"
+              style={{
+                borderColor: P.line,
+                color: P.ink,
+                background: P.surface,
+              }}
             >
-              <Download size={15} />
+              <Download size={17} />
               Export safety audit
             </button>
 
             <Link
               to="/route-planner"
-              className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium"
-              style={{ background: P.accent, color: P.ink }}
+              className="inline-flex items-center gap-space-xs rounded-xl px-space-md py-space-sm font-headline-sm text-headline-sm"
+              style={{
+                background: P.accent,
+                color: P.ink,
+              }}
             >
-              <Route size={15} />
+              <Route size={17} />
               Track new corridor
             </Link>
           </div>
         </header>
 
         {/* FILTER TABS */}
-        <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            <PillTab active={filter === "all"} label="All monitored" count={counts.all} onClick={() => setFilter("all")} />
-            <PillTab active={filter === "favorites"} label="Favourites" count={counts.favorites} onClick={() => setFilter("favorites")} />
-            <PillTab active={filter === "recurring"} label="Recurring" count={counts.recurring} onClick={() => setFilter("recurring")} />
-            <PillTab active={filter === "elevated"} label="Elevated risk" count={counts.elevated} onClick={() => setFilter("elevated")} />
+        <div className="mt-space-lg flex flex-wrap items-center justify-between gap-space-xs">
+          <div className="flex flex-wrap gap-space-2xs">
+            <PillTab
+              active={filter === "all"}
+              label="All monitored"
+              count={counts.all}
+              onClick={() => setFilter("all")}
+            />
+            <PillTab
+              active={filter === "favorites"}
+              label="Favourites"
+              count={counts.favorites}
+              onClick={() => setFilter("favorites")}
+            />
+            <PillTab
+              active={filter === "recurring"}
+              label="Recurring"
+              count={counts.recurring}
+              onClick={() => setFilter("recurring")}
+            />
+            <PillTab
+              active={filter === "elevated"}
+              label="Elevated risk"
+              count={counts.elevated}
+              onClick={() => setFilter("elevated")}
+            />
           </div>
 
-          <span className="text-xs" style={{ color: P.inkFaint }}>
+          <span
+            className="font-body-sm text-body-sm"
+            style={{ color: P.inkFaint }}
+          >
             Showing {visibleCommutes.length} of {savedCommutes.length} corridors
           </span>
         </div>
 
         {/* STAT TILES */}
-        <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="mt-space-md grid gap-space-sm sm:grid-cols-2 lg:grid-cols-4">
           <StatTile
             label="Active corridors"
             value={`${savedCommutes.length}`}
-            sub={savedCommutes.map((c) => c.name).slice(0, 2).join(", ") || "—"}
+            sub={
+              savedCommutes.map((c) => c.name).slice(0, 2).join(", ") || "—"
+            }
           />
+
           <StatTile
             label="Average safety index"
             value={avgRisk !== null ? `${avgRisk}` : "—"}
@@ -844,42 +1120,55 @@ export default function SavedCorridorsCommuteArchive() {
                 : undefined
             }
           />
+
           <StatTile
             label="Active signals"
             value={`${totalActiveSignals}`}
             sub="Segments currently carrying a safety signal"
           />
+
           <StatTile
             label="Highest exposure"
             value={highestOverall ? `${highestOverall.score}` : "—"}
-            sub={highestOverall ? highestOverall.commute.name : "No data yet"}
+            sub={
+              highestOverall
+                ? highestOverall.commute.name
+                : "No data yet"
+            }
           />
         </section>
 
         {/* CORRIDOR GRID */}
-        <section className="mt-10">
+        <section className="mt-space-2xl">
           <div className="flex items-end justify-between">
             <div>
               <span
-                className="text-[10px] uppercase tracking-[0.18em]"
+                className="font-label-caps-micro text-label-caps-micro uppercase"
                 style={{ color: P.accentDeep }}
               >
                 Saved corridor guardians
               </span>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight" style={{ color: P.ink }}>
+
+              <h2
+                className="mt-space-xs font-headline-lg text-headline-lg text-on-surface font-normal"
+                style={{ color: P.ink }}
+              >
                 Continuous polyline evaluations for every saved corridor
               </h2>
             </div>
           </div>
 
           {visibleCommutes.length ? (
-            <div className="mt-6 grid gap-5 lg:grid-cols-2">
+            <div className="mt-space-lg grid gap-space-lg lg:grid-cols-2">
               {visibleCommutes.map((item, index) => (
                 <CorridorCard
                   key={item.id}
                   commute={item}
                   index={index}
-                  checking={checkingId === item.id || (loading && checkingId === item.id)}
+                  checking={
+                    checkingId === item.id ||
+                    (loading && checkingId === item.id)
+                  }
                   renaming={renamingId === item.id}
                   nameDraft={nameDraft}
                   onNameDraftChange={setNameDraft}
@@ -894,8 +1183,12 @@ export default function SavedCorridorsCommuteArchive() {
             </div>
           ) : (
             <div
-              className="mt-6 rounded-2xl border p-8 text-center text-sm"
-              style={{ borderColor: P.line, background: P.surface, color: P.inkSoft }}
+              className="mt-space-lg rounded-2xl border p-space-xl text-center font-body-md text-body-md"
+              style={{
+                borderColor: P.line,
+                background: P.surface,
+                color: P.inkSoft,
+              }}
             >
               No corridors match this filter.
             </div>
@@ -903,123 +1196,208 @@ export default function SavedCorridorsCommuteArchive() {
         </section>
 
         {/* HISTORY + SIDEBAR */}
-        <section className="mt-10 grid gap-6 lg:grid-cols-12">
+        <section className="mt-space-2xl grid gap-space-lg lg:grid-cols-12">
           <div
-            className="rounded-[2rem] border p-7 lg:col-span-8 lg:p-9"
-            style={{ borderColor: P.line, background: P.surface }}
+            className="rounded-[2rem] border p-space-xl lg:col-span-8 lg:p-space-2xl"
+            style={{
+              borderColor: P.line,
+              background: P.surface,
+            }}
           >
-            <div className="flex items-center gap-2">
-              <History size={16} style={{ color: P.accentDeep }} />
+            <div className="flex items-center gap-space-2xs">
+              <History size={18} style={{ color: P.accentDeep }} />
+
               <span
-                className="text-[10px] uppercase tracking-[0.18em]"
+                className="font-label-caps-micro text-label-caps-micro uppercase"
                 style={{ color: P.accentDeep }}
               >
                 Verified trips
               </span>
             </div>
 
-            <h3 className="mt-3 text-2xl font-semibold tracking-tight" style={{ color: P.ink }}>
+            <h3
+              className="mt-space-xs font-headline-md text-headline-md text-on-surface font-medium"
+              style={{ color: P.ink }}
+            >
               Historical commute safety log
             </h3>
 
             {snapshotsWithCommute.length ? (
-              <div className="mt-6 overflow-x-auto">
-                <table className="w-full text-left text-sm">
+              <div className="mt-space-lg overflow-x-auto">
+                <table className="w-full text-left font-body-sm text-body-sm">
                   <thead>
                     <tr
-                      className="text-[10px] uppercase tracking-[0.1em]"
+                      className="font-label-caps-micro text-label-caps-micro uppercase"
                       style={{ color: P.inkFaint }}
                     >
-                      <th className="pb-3 pr-4 font-medium">Date & time</th>
-                      <th className="pb-3 pr-4 font-medium">Corridor</th>
-                      <th className="pb-3 pr-4 font-medium">Delta</th>
-                      <th className="pb-3 pr-4 font-medium">Top signal</th>
-                      <th className="pb-3 font-medium">Status</th>
+                      <th className="pb-space-sm pr-space-md font-medium">
+                        Date & time
+                      </th>
+                      <th className="pb-space-sm pr-space-md font-medium">
+                        Corridor
+                      </th>
+                      <th className="pb-space-sm pr-space-md font-medium">
+                        Delta
+                      </th>
+                      <th className="pb-space-sm pr-space-md font-medium">
+                        Top signal
+                      </th>
+                      <th className="pb-space-sm font-medium">
+                        Status
+                      </th>
                     </tr>
                   </thead>
+
                   <tbody>
-                    {snapshotsWithCommute.slice(0, 8).map(({ commute, snapshot, previous }, i) => {
-                      const delta = previous
-                        ? Math.round(
-                            (snapshot.route.route_total_risk -
-                              previous.route.route_total_risk) *
-                              10,
-                          ) / 10
-                        : null;
+                    {snapshotsWithCommute
+                      .slice(0, 8)
+                      .map(
+                        (
+                          { commute, snapshot, previous },
+                          i,
+                        ) => {
+                          const delta = previous
+                            ? Math.round(
+                                (snapshot.route.route_total_risk -
+                                  previous.route.route_total_risk) *
+                                  10,
+                              ) / 10
+                            : null;
 
-                      const topReason =
-                        previous && segmentDiffs(snapshot, previous)[0]?.reason;
+                          const topReason = previous
+                            ? segmentDiffs(snapshot, previous)[0]
+                                ?.reason ??
+                              (delta !== null && delta !== 0
+                                ? "Overall risk shift (segment detail unavailable)"
+                                : "No meaningful change")
+                            : "First recorded check";
 
-                      return (
-                        <tr
-                          key={snapshot.id ?? i}
-                          className="border-t"
-                          style={{ borderColor: P.line }}
-                        >
-                          <td className="py-3 pr-4 whitespace-nowrap" style={{ color: P.inkSoft }}>
-                            {shortDateTime(snapshot.checkedAt)}
-                          </td>
-                          <td className="py-3 pr-4 font-medium" style={{ color: P.ink }}>
-                            {commute.name}
-                          </td>
-                          <td className="py-3 pr-4">
-                            {delta !== null ? (
-                              <span
-                                className="inline-flex items-center gap-1 font-semibold"
-                                style={{ color: delta > 0 ? P.red : delta < 0 ? P.green : P.inkSoft }}
-                              >
-                                {delta > 0 ? <ArrowUpRight size={12} /> : delta < 0 ? <ArrowDownRight size={12} /> : null}
-                                {delta > 0 ? "+" : ""}
-                                {delta}
-                              </span>
-                            ) : (
-                              <span style={{ color: P.inkFaint }}>Baseline</span>
-                            )}
-                          </td>
-                          <td className="py-3 pr-4" style={{ color: P.inkSoft }}>
-                            {topReason ?? "First recorded check"}
-                          </td>
-                          <td className="py-3">
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.08em]"
-                              style={
-                                delta === null || delta <= 0
-                                  ? { background: `${P.green}1A`, color: P.green }
-                                  : { background: `${P.orange}1A`, color: P.orange }
-                              }
+                          return (
+                            <tr
+                              key={snapshot.id ?? i}
+                              className="border-t"
+                              style={{ borderColor: P.line }}
                             >
-                              {delta === null || delta <= 0 ? "Protected" : "Elevated"}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                              <td
+                                className="whitespace-nowrap py-space-sm pr-space-md font-body-sm text-body-sm"
+                                style={{ color: P.inkSoft }}
+                              >
+                                {shortDateTime(snapshot.checkedAt)}
+                              </td>
+
+                              <td
+                                className="py-space-sm pr-space-md font-body-sm text-body-sm font-medium"
+                                style={{ color: P.ink }}
+                              >
+                                {commute.name}
+                              </td>
+
+                              <td className="py-space-sm pr-space-md">
+                                {delta !== null ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 font-body-sm text-body-sm font-semibold"
+                                    style={{
+                                      color:
+                                        delta > 0
+                                          ? P.red
+                                          : delta < 0
+                                            ? P.green
+                                            : P.inkSoft,
+                                    }}
+                                  >
+                                    {delta > 0 ? (
+                                      <ArrowUpRight size={15} />
+                                    ) : delta < 0 ? (
+                                      <ArrowDownRight size={15} />
+                                    ) : null}
+                                    {delta > 0 ? "+" : ""}
+                                    {delta}
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="font-body-sm text-body-sm"
+                                    style={{ color: P.inkFaint }}
+                                  >
+                                    Baseline
+                                  </span>
+                                )}
+                              </td>
+
+                              <td
+                                className="py-space-sm pr-space-md font-body-sm text-body-sm"
+                                style={{ color: P.inkSoft }}
+                              >
+                                {topReason}
+                              </td>
+
+                              <td className="py-space-sm">
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full px-space-xs py-space-2xs font-label-caps-micro text-label-caps-micro uppercase"
+                                  style={
+                                    delta === null || delta <= 0
+                                      ? {
+                                          background: `${P.green}1A`,
+                                          color: P.green,
+                                        }
+                                      : {
+                                          background: `${P.orange}1A`,
+                                          color: P.orange,
+                                        }
+                                  }
+                                >
+                                  {delta === null || delta <= 0
+                                    ? "Improved"
+                                    : "Increased"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        },
+                      )}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <p className="mt-6 text-sm" style={{ color: P.inkSoft }}>
+              <p
+                className="mt-space-lg font-body-sm text-body-sm"
+                style={{ color: P.inkSoft }}
+              >
                 No checks recorded yet.
               </p>
             )}
 
             <div
-              className="mt-7 flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-5"
-              style={{ borderColor: P.line, background: P.surfaceAlt }}
+              className="mt-space-lg flex flex-wrap items-center justify-between gap-space-sm rounded-2xl border p-space-lg"
+              style={{
+                borderColor: P.line,
+                background: P.surfaceAlt,
+              }}
             >
               <div>
-                <p className="text-[9px] uppercase tracking-[0.15em]" style={{ color: P.inkFaint }}>
+                <p
+                  className="font-label-caps-micro text-label-caps-micro uppercase"
+                  style={{ color: P.inkFaint }}
+                >
                   Aggregate exposure
                 </p>
-                <p className="mt-1 text-sm font-medium" style={{ color: P.ink }}>
-                  {totalChecks} safety check{totalChecks === 1 ? "" : "s"} recorded across{" "}
-                  {savedCommutes.length} corridor{savedCommutes.length === 1 ? "" : "s"}
+
+                <p
+                  className="mt-space-2xs font-body-sm text-body-sm font-medium"
+                  style={{ color: P.ink }}
+                >
+                  {totalChecks} safety check
+                  {totalChecks === 1 ? "" : "s"} recorded across{" "}
+                  {savedCommutes.length} corridor
+                  {savedCommutes.length === 1 ? "" : "s"}
                 </p>
               </div>
+
               {riskDelta !== null && (
                 <span
-                  className="text-lg font-semibold"
-                  style={{ color: riskDelta <= 0 ? P.green : P.red }}
+                  className="font-headline-sm text-headline-sm font-semibold"
+                  style={{
+                    color: riskDelta <= 0 ? P.green : P.red,
+                  }}
                 >
                   {riskDelta > 0 ? "+" : ""}
                   {riskDelta}
@@ -1029,59 +1407,98 @@ export default function SavedCorridorsCommuteArchive() {
           </div>
 
           <aside
-            className="rounded-[2rem] p-7 lg:col-span-4 lg:p-8"
-            style={{ background: P.ink, color: P.surface }}
+            className="rounded-[2rem] p-space-xl lg:col-span-4 lg:p-space-xl"
+            style={{
+              background: P.ink,
+              color: P.surface,
+            }}
           >
             <span
-              className="text-[10px] uppercase tracking-[0.18em]"
+              className="font-label-caps-micro text-label-caps-micro uppercase"
               style={{ color: P.accent }}
             >
               Corridor provisioning
             </span>
 
-            <h3 className="mt-3 text-2xl font-semibold tracking-tight">
+            <h3 className="mt-space-xs font-headline-md text-headline-md font-medium">
               How corridors are monitored
             </h3>
 
-            <p className="mt-4 text-sm leading-6 text-white/55">
+            <p className="mt-space-md font-body-md text-body-md leading-relaxed text-white/55">
               Every route you track is re-checked against traffic, road-surface,
               weather and news signals each time you run “Check now,” and the
               result is kept as a permanent local safety history.
             </p>
 
-            <div className="mt-7 space-y-5">
-              <div className="flex items-start gap-3">
-                <CarFront size={16} className="mt-0.5 shrink-0" style={{ color: P.accent }} />
+            <div className="mt-space-lg space-y-space-md">
+              <div className="flex items-start gap-space-sm">
+                <CarFront
+                  size={18}
+                  className="mt-0.5 shrink-0"
+                  style={{ color: P.accent }}
+                />
+
                 <div>
-                  <p className="text-sm font-medium">Traffic conditions</p>
-                  <p className="mt-1 text-xs leading-5 text-white/45">
-                    Live congestion state feeds directly into each segment's score.
+                  <p className="font-body-md text-body-md font-semibold">
+                    Traffic conditions
+                  </p>
+
+                  <p className="mt-space-2xs font-body-sm text-body-sm leading-relaxed text-white/45">
+                    Live congestion state feeds directly into each segment's
+                    score.
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
-                <Droplets size={16} className="mt-0.5 shrink-0" style={{ color: P.accent }} />
+
+              <div className="flex items-start gap-space-sm">
+                <Droplets
+                  size={18}
+                  className="mt-0.5 shrink-0"
+                  style={{ color: P.accent }}
+                />
+
                 <div>
-                  <p className="text-sm font-medium">Waterlogging signal</p>
-                  <p className="mt-1 text-xs leading-5 text-white/45">
+                  <p className="font-body-md text-body-md font-semibold">
+                    Waterlogging signal
+                  </p>
+
+                  <p className="mt-space-2xs font-body-sm text-body-sm leading-relaxed text-white/45">
                     Flagged corridors surface an advisory on their card.
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
-                <Newspaper size={16} className="mt-0.5 shrink-0" style={{ color: P.accent }} />
+
+              <div className="flex items-start gap-space-sm">
+                <Newspaper
+                  size={18}
+                  className="mt-0.5 shrink-0"
+                  style={{ color: P.accent }}
+                />
+
                 <div>
-                  <p className="text-sm font-medium">Nearby incident reports</p>
-                  <p className="mt-1 text-xs leading-5 text-white/45">
+                  <p className="font-body-md text-body-md font-semibold">
+                    Nearby incident reports
+                  </p>
+
+                  <p className="mt-space-2xs font-body-sm text-body-sm leading-relaxed text-white/45">
                     News-derived flags are counted per snapshot for context.
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
-                <Activity size={16} className="mt-0.5 shrink-0" style={{ color: P.accent }} />
+
+              <div className="flex items-start gap-space-sm">
+                <Activity
+                  size={18}
+                  className="mt-0.5 shrink-0"
+                  style={{ color: P.accent }}
+                />
+
                 <div>
-                  <p className="text-sm font-medium">Road-surface detections</p>
-                  <p className="mt-1 text-xs leading-5 text-white/45">
+                  <p className="font-body-md text-body-md font-semibold">
+                    Road-surface detections
+                  </p>
+
+                  <p className="mt-space-2xs font-body-sm text-body-sm leading-relaxed text-white/45">
                     Vision-based severity readings roll up into active signals.
                   </p>
                 </div>
@@ -1090,10 +1507,13 @@ export default function SavedCorridorsCommuteArchive() {
 
             <Link
               to="/route-planner"
-              className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium"
-              style={{ background: P.accent, color: P.ink }}
+              className="mt-space-xl inline-flex w-full items-center justify-center gap-space-xs rounded-xl px-space-md py-space-md font-headline-sm text-headline-sm"
+              style={{
+                background: P.accent,
+                color: P.ink,
+              }}
             >
-              <Route size={15} />
+              <Route size={17} />
               Set up new tracked route
             </Link>
           </aside>
@@ -1101,12 +1521,19 @@ export default function SavedCorridorsCommuteArchive() {
 
         {/* FOOTER META */}
         <div
-          className="mt-10 flex flex-col gap-3 border-t pt-6 text-xs md:flex-row md:items-center md:justify-between"
-          style={{ borderColor: P.line, color: P.inkSoft }}
+          className="mt-space-2xl flex flex-col gap-space-xs border-t pt-space-lg font-body-sm text-body-sm md:flex-row md:items-center md:justify-between"
+          style={{
+            borderColor: P.line,
+            color: P.inkSoft,
+          }}
         >
-          <span>Saved locally on this device · no account required</span>
           <span>
-            {totalChecks} safety check{totalChecks === 1 ? "" : "s"} recorded
+            Saved locally on this device · no account required
+          </span>
+
+          <span>
+            {totalChecks} safety check
+            {totalChecks === 1 ? "" : "s"} recorded
           </span>
         </div>
       </div>
