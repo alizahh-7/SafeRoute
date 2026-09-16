@@ -1,0 +1,73 @@
+﻿"""
+api/main.py
+The actual web server the frontend calls. Reuses the exact same pipeline
+logic as the root main.py â€” no duplicated code.
+"""
+
+from pathlib import Path
+from urllib.parse import quote
+
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from main import run_pipeline
+from src.risk_engine.fusion import route_total_risk
+from src.routing.alt_route import suggest_safer_route
+from src.api_clients.geocode import geocode, get_location_suggestions, reverse_geocode
+from src.news.news_check import get_news_flags, get_route_news_advisory
+
+app = FastAPI()
+FALLBACK_IMAGE_DIR = Path(__file__).resolve().parents[1] / "data" / "india_subset" / "test" / "images"
+app.mount("/vision-fallback", StaticFiles(directory=FALLBACK_IMAGE_DIR), name="vision-fallback")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class RouteRequest(BaseModel):
+    origin: str
+    destination: str
+
+
+@app.post("/route-risk")
+def get_route_risk(req: RouteRequest, request: Request):
+    segments = run_pipeline(req.origin, req.destination)
+    # Local RDD fallback paths are usable by Python but not by the browser.
+    # Expose only the basename through this API's read-only static mount.
+    for segment in segments:
+        if segment.get("vision_source") == "rdd2022_sample" and segment.get("image_url"):
+            filename = quote(Path(segment["image_url"]).name)
+            segment["image_url"] = f"{request.base_url}vision-fallback/{filename}"
+
+    road_names = [s["road_name"] for s in segments]
+    news_advisory = get_route_news_advisory(road_names)
+
+    return {
+        "route_total_risk": route_total_risk(segments),
+        "segments": segments,
+        "should_prompt_reroute": news_advisory["should_prompt_reroute"],
+    }
+    
+@app.post("/alternate-route")
+def get_alternate_route(req: RouteRequest):
+    return suggest_safer_route(req.origin, req.destination)
+
+@app.get("/location-suggestions")
+def location_suggestions(q: str):
+    return {"suggestions": get_location_suggestions(q)}
+
+@app.get("/reverse-geocode")
+def reverse_geocode_endpoint(lat: float, lon: float):
+    return {"label": reverse_geocode(lat, lon)}
+
+@app.get("/city-news")
+def city_news():
+    flags = get_news_flags("Hyderabad")
+    return {"headlines": flags or []}

@@ -30,6 +30,7 @@ export interface RouteSegment {
   vision_source: ImageSource;
   image_url: string | null;
   news_flags: string[] | null;
+  news_risk_score?: number;
   final_score: number;
   explanation: string;
 }
