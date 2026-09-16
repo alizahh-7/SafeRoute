@@ -30,6 +30,7 @@ export interface RouteSegment {
   vision_source: ImageSource;
   image_url: string | null;
   news_flags: string[] | null;
+  news_risk_score?: number;
   final_score: number;
   explanation: string;
 }
@@ -49,4 +50,31 @@ export interface AlternateRouteResponse {
   extra_time_minutes?: number;
   primary_segments?: RouteSegment[];
   alternate_segments?: RouteSegment[] | null;
+}
+
+export type RiskCategory = "low" | "moderate" | "high" | "severe";
+
+export interface SafetySnapshot {
+  id: string;
+  checkedAt: string;
+  route: RouteRiskResponse;
+  riskCategory: RiskCategory;
+  activeSignals: number;
+  highestRiskSegmentId: string | null;
+  weatherState: "clear" | "caution" | "unavailable";
+  trafficState: TrafficLevel | "mixed";
+  waterloggingActive: boolean;
+  newsCount: number;
+  visionDetections: number;
+}
+
+export interface SavedCommute {
+  id: string;
+  name: string;
+  origin: string;
+  destination: string;
+  favorite: boolean;
+  recurring: boolean;
+  createdAt: string;
+  snapshots: SafetySnapshot[];
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
-import { Navigation, ShieldCheck, AlertTriangle, Zap, Eye, CheckCircle, Pause, Play, Square, CloudRain } from "lucide-react";
+import { Navigation, ShieldCheck, AlertTriangle, Zap, Eye, CheckCircle, Pause, Play, Square, CloudRain, Bookmark, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useRouteContext } from "../context/RouteContext";
 import RouteMap from "../components/RouteMap";
@@ -11,6 +11,7 @@ import SegmentRiskBadge from "../components/SegmentRiskBadge";
 import type { RouteSegment } from "../types/route";
 import { buildRouteGeometry } from "../components/RouteMap";
 import type { LatLngTuple } from "leaflet";
+import { downloadSafetyReport as exportSafetyReport } from "../services/safetyReport";
 
 const riskColor = (score: number) => score >= 75 ? "#B93535" : score >= 50 ? "#D36128" : score >= 30 ? "#D99B26" : "#2E7D5B";
 
@@ -50,7 +51,7 @@ function isHazardWorthy(segment: RouteSegment): boolean {
 }
 
 const RouteResults = () => {
-  const { routeData, alternateData, origin, destination, loading, alternateLoading, error, acceptAlternateRoute } = useRouteContext();
+  const { routeData, alternateData, origin, destination, loading, alternateLoading, error, acceptAlternateRoute, savedCommutes, saveCurrentCommute } = useRouteContext();
   const [activeSegment, setActiveSegment] = useState<RouteSegment | null>(null);
   const [driveIndex, setDriveIndex] = useState(0);
   const [driving, setDriving] = useState(false);
@@ -58,31 +59,23 @@ const RouteResults = () => {
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [voiceOn, setVoiceOn] = useState(false);
   const [rerouteProgress, setRerouteProgress] = useState<number | null>(null);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [commuteName, setCommuteName] = useState("");
+  const [favoriteCommute, setFavoriteCommute] = useState(false);
+  const [recurringCommute, setRecurringCommute] = useState(false);
 
-  if (loading) return <div className="pt-32 text-center font-body-lg">Analyzing your route with real data...</div>;
-  if (error) return <div className="pt-32 text-center font-body-lg text-error">{error}</div>;
-  if (!routeData) return (
-    <div className="pt-32 text-center font-body-lg flex flex-col items-center gap-space-md">
-      <p>No route yet — go plan one first.</p>
-      <Link to="/route-planner" className="btn btn-primary">Go to Route Planner</Link>
-    </div>
-  );
+  const segments = routeData?.segments ?? [];
 
-  const { route_total_risk, segments } = routeData;
-  const primaryColor = riskColor(route_total_risk);
-  const hazardCount = segments.filter(s => s.waterlogging_flag || s.news_flags?.length || s.vision_severity !== "none").length;
-  const worstSegment = segments.reduce((worst, s) => !worst || s.final_score > worst.final_score ? s : worst, segments[0]);
-  const showAlternate = alternateData?.alternate_available && alternateData.should_suggest_alternate;
   const routePoints = useMemo(() => buildRouteGeometry(segments), [segments]);
 
   const segmentBoundaries = useMemo(() => {
-  let acc = 0;
-  return segments.map((segment) => {
-    const start = acc;
-    acc += segment.coordinates.length;
-    return { segment, start, end: acc };
-  });
-}, [segments]);
+    let acc = 0;
+    return segments.map((segment) => {
+      const start = acc;
+      acc += segment.coordinates.length;
+      return { segment, start, end: acc };
+    });
+  }, [segments]);
 
   const drivePosition: LatLngTuple | null = routePoints[driveIndex] ?? null;
 
@@ -117,7 +110,7 @@ const RouteResults = () => {
           if (distanceAhead <= LOOKAHEAD_METERS) {
             approaching = segment;
           }
-          break; // nearest upcoming hazard only — further ones are farther away by definition
+          break; // nearest upcoming hazard only â€” further ones are farther away by definition
         }
 
         if (approaching) {
@@ -143,6 +136,22 @@ const RouteResults = () => {
     return () => window.clearInterval(timer);
   }, [driving, routePoints, segmentBoundaries, dismissedIds, voiceOn]);
 
+  if (loading) return <div className="pt-32 text-center font-body-lg">Analyzing your route with real data...</div>;
+  if (error) return <div className="pt-32 text-center font-body-lg text-error">{error}</div>;
+  if (!routeData) return (
+    <div className="pt-32 text-center font-body-lg flex flex-col items-center gap-space-md">
+      <p>No route yet â€” go plan one first.</p>
+      <Link to="/route-planner" className="btn btn-primary">Go to Route Planner</Link>
+    </div>
+  );
+
+  const { route_total_risk } = routeData;
+  const primaryColor = riskColor(route_total_risk);
+  const hazardCount = segments.filter(s => s.waterlogging_flag || s.news_flags?.length || s.vision_severity !== "none").length;
+  const worstSegment = segments.reduce((worst, s) => !worst || s.final_score > worst.final_score ? s : worst, segments[0]);
+  const showAlternate = alternateData?.alternate_available && alternateData.should_suggest_alternate;
+  const savedCommute = savedCommutes.find((commute) => commute.origin === origin && commute.destination === destination);
+
   const stopDrive = () => { setDriving(false); setDriveIndex(0); setDriveAlert(null); setDismissedIds(new Set()); window.speechSynthesis.cancel(); };
   const continueDrive = () => {
     window.speechSynthesis.cancel();
@@ -160,11 +169,13 @@ const RouteResults = () => {
   };
   
   const downloadSafetyReport = () => {
+    exportSafetyReport(origin, destination, routeData);
+    return;
     const report = new jsPDF({ orientation: "landscape", unit: "mm", format: "a3" });
     const pageWidth = report.internal.pageSize.getWidth();
     const pageHeight = report.internal.pageSize.getHeight();
     const margin = 12;
-    const truncate = (value: string, maxLength: number) => value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
+    const truncate = (value: string, maxLength: number) => value.length > maxLength ? `${value.slice(0, maxLength - 1)}â€¦` : value;
     const flagStatus = (segment: RouteSegment) => [
       segment.waterlogging_flag ? "Waterlogging" : "",
       ...(segment.news_flags ?? []).length ? "News" : "",
@@ -173,10 +184,10 @@ const RouteResults = () => {
     report.setTextColor(26, 26, 24);
     report.setFont("helvetica", "bold");
     report.setFontSize(20);
-    report.text("SafeRoute Telangana — Safety Report", margin, 18);
+    report.text("SafeRoute Telangana â€” Safety Report", margin, 18);
     report.setFont("helvetica", "normal");
     report.setFontSize(9);
-    report.text(`Route: ${origin} → ${destination}`, margin, 26);
+    report.text(`Route: ${origin} â†’ ${destination}`, margin, 26);
     report.text(`Overall risk: ${route_total_risk}/100     Generated: ${new Date().toLocaleString()}`, margin, 32);
 
     report.setFillColor(248, 244, 232);
@@ -229,6 +240,10 @@ const RouteResults = () => {
     report.text("Data sources: IIT Delhi Telangana crash dataset, Open-Meteo, TomTom, YOLOv8 road-surface detection, Google News RSS", margin, pageHeight - 6);
     report.save("SafeRoute-Telangana-Safety-Report.pdf");
   };
+  const saveCommute = () => {
+    const id = saveCurrentCommute(commuteName || `${origin} â†’ ${destination}`, { favorite: favoriteCommute, recurring: recurringCommute });
+    if (id) setSaveOpen(false);
+  };
 
   return (
     <div className="w-full pt-20 bg-background min-h-screen pb-space-3xl">
@@ -237,7 +252,7 @@ const RouteResults = () => {
         <div className="flex justify-between items-end flex-wrap gap-space-md mb-space-xl">
           <div className="flex flex-col gap-space-xs">
             <span className="font-label-caps-micro text-label-caps-micro uppercase text-secondary font-bold tracking-widest bg-secondary-container/20 px-space-sm py-space-2xs rounded-full self-start">Real-Data Route Analysis</span>
-            <h1 className="font-display-hero text-display-hero text-on-surface tracking-tight font-medium max-w-2xl leading-tight">{origin} → {destination}</h1>
+            <h1 className="font-display-hero text-display-hero text-on-surface tracking-tight font-medium max-w-2xl leading-tight">{origin} â†’ {destination}</h1>
           </div>
           <div className="text-right">
             <div className="font-display-hero text-display-hero font-semibold leading-none" style={{ color: primaryColor }}>{route_total_risk}</div>
@@ -253,10 +268,13 @@ const RouteResults = () => {
             <p className="font-label-caps-micro text-label-caps-micro uppercase text-on-surface-variant mt-space-xs">Source: segment-level multi-factor risk fusion</p>
           </div>
           <div className="flex flex-wrap gap-space-xs shrink-0">
+            <button type="button" onClick={() => { setCommuteName(savedCommute?.name ?? `${origin} â†’ ${destination}`); setFavoriteCommute(savedCommute?.favorite ?? false); setRecurringCommute(savedCommute?.recurring ?? false); setSaveOpen(true); }} className="btn btn-outline"><Bookmark size={16} fill={savedCommute ? "currentColor" : "none"}/>{savedCommute ? "Saved" : "Save Commute"}</button>
             <button type="button" onClick={downloadSafetyReport} className="btn btn-primary">Download Safety Report</button>
             <button type="button" onClick={() => setActiveSegment(worstSegment)} className="btn btn-outline">Inspect this segment</button>
           </div>
         </div>
+
+        {saveOpen && <section className="mb-space-xl rounded-xl border border-secondary-container bg-surface-container-low p-space-lg"><div className="flex flex-wrap justify-between gap-space-sm"><div><span className="font-label-caps-micro uppercase text-secondary">Save recurring route</span><h2 className="font-headline-sm mt-space-xs">Build a safety profile for this commute</h2><p className="font-body-sm text-on-surface-variant mt-space-xs">Future â€œCheck Nowâ€ actions will rerun the existing route pipeline and append timestamped safety snapshots on this device.</p></div><button type="button" onClick={() => setSaveOpen(false)} className="font-body-sm">Close</button></div><div className="mt-space-md flex flex-col lg:flex-row gap-space-sm lg:items-end"><label className="flex-1 font-body-sm">Commute name<input value={commuteName} onChange={(event) => setCommuteName(event.target.value)} className="mt-space-xs block w-full rounded-lg border border-surface-variant bg-surface-container-lowest px-space-md py-space-sm" placeholder="Home â†’ College"/></label><label className="inline-flex items-center gap-space-xs font-body-sm"><input type="checkbox" checked={favoriteCommute} onChange={(event) => setFavoriteCommute(event.target.checked)}/><Star size={15} className="text-secondary"/>Favourite</label><label className="inline-flex items-center gap-space-xs font-body-sm"><input type="checkbox" checked={recurringCommute} onChange={(event) => setRecurringCommute(event.target.checked)}/>Recurring commute</label><button type="button" onClick={saveCommute} className="btn btn-primary">{savedCommute ? "Update saved commute" : "Save Commute"}</button></div></section>}
 
         {alternateData?.alternate_available && (
           <div className="rounded-xl p-space-lg mb-space-xl bg-surface-container-low flex items-center gap-space-sm">
@@ -270,7 +288,7 @@ const RouteResults = () => {
             ) : (
               <>
                 <AlertTriangle className="text-on-surface-variant shrink-0" size={20} />
-                <p className="font-body-sm text-on-surface-variant">No meaningfully safer alternate was found for this trip — this route is already close to the best available option.</p>
+                <p className="font-body-sm text-on-surface-variant">No meaningfully safer alternate was found for this trip â€” this route is already close to the best available option.</p>
               </>
             )}
           </div>
@@ -295,9 +313,9 @@ const RouteResults = () => {
                 <Zap size={20} />
               </div>
               <div>
-                <div className="font-headline-sm font-semibold">{segments.length} segments · {hazardCount} with an active hazard signal</div>
-                <div className="font-body-sm text-on-surface-variant">Historical crash data, live weather, live traffic, waterlogging fusion, road-surface vision, and local news — click any segment for the full breakdown.</div>
-                <div className="font-label-caps-micro text-label-caps-micro uppercase text-on-surface-variant mt-space-2xs">Sources: IIT Delhi · Open-Meteo · TomTom · YOLOv8 · Google News RSS</div>
+                <div className="font-headline-sm font-semibold">{segments.length} segments Â· {hazardCount} with an active hazard signal</div>
+                <div className="font-body-sm text-on-surface-variant">Historical crash data, live weather, live traffic, waterlogging fusion, road-surface vision, and local news â€” click any segment for the full breakdown.</div>
+                <div className="font-label-caps-micro text-label-caps-micro uppercase text-on-surface-variant mt-space-2xs">Sources: IIT Delhi Â· Open-Meteo Â· TomTom Â· YOLOv8 Â· Google News RSS</div>
               </div>
             </div>
           </div>
@@ -318,8 +336,8 @@ const RouteResults = () => {
                   <div>
                     <div className="font-body-md font-semibold">{seg.road_name}</div>
                     <div className="font-body-sm text-on-surface-variant mt-space-2xs flex items-center gap-space-xs flex-wrap">
-                      <Eye size={12} /> {seg.vision_severity} surface · {seg.traffic_status === "unavailable" ? "traffic unavailable" : `live ${seg.traffic_level} traffic`}
-                      {seg.weather_status === "unavailable" ? <><CloudRain size={12} className="text-on-surface-variant" /> weather unavailable</> : seg.weather_modifier >= 10 ? <><CloudRain size={12} className="text-[#3A7CA5]" /> live weather caution</> : <span>· weather clear</span>}
+                      <Eye size={12} /> {seg.vision_severity} surface Â· {seg.traffic_status === "unavailable" ? "traffic unavailable" : `live ${seg.traffic_level} traffic`}
+                      {seg.weather_status === "unavailable" ? <><CloudRain size={12} className="text-on-surface-variant" /> weather unavailable</> : seg.weather_modifier >= 10 ? <><CloudRain size={12} className="text-[#3A7CA5]" /> live weather caution</> : <span>Â· weather clear</span>}
                       {seg.waterlogging_flag ? <span className="text-[#B93535]">waterlogging</span> : null}
                       {seg.news_flags?.length ? <><AlertTriangle size={12} className="text-[#B93535]" /> news</> : null}
                     </div>
@@ -334,7 +352,7 @@ const RouteResults = () => {
         <div className="mt-space-xl p-space-lg rounded-xl bg-surface-container-low text-center">
           <CheckCircle size={20} className="inline text-[#2E7D5B] mr-space-2xs" />
           <span className="font-body-sm">Want the full picture across every segment at once? </span>
-          <Link to="/analytics" className="font-body-sm text-secondary hover:underline font-semibold">Open the Analytics Heatmap →</Link>
+          <Link to="/analytics" className="font-body-sm text-secondary hover:underline font-semibold">Open the Analytics Heatmap â†’</Link>
         </div>
       </div>
 
