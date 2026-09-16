@@ -1,4 +1,5 @@
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer } from "react-leaflet";
+﻿import { useEffect } from "react";
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import type { LatLngBoundsExpression, LatLngTuple } from "leaflet";
 import type { RouteSegment } from "../types/route";
 
@@ -17,12 +18,28 @@ export const buildRouteGeometry = (segments: RouteSegment[]): LatLngTuple[] =>
     (point, index, points) => index === 0 || point[0] !== points[index - 1][0] || point[1] !== points[index - 1][1],
   );
 
+// Leaflet ko force karta hai apna size recalculate karne ke liye
+// jab bhi container resize ho (e.g. sidebar drawer expand/collapse)
+function MapResizeHandler() {
+  const map = useMap();
+
+  useEffect(() => {
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [map]);
+
+  return null;
+}
+
 function SegmentPopup({ segment, onSelect }: { segment: RouteSegment; onSelect?: (segment: RouteSegment) => void }) {
   const weather = segment.weather_status === "unavailable"
     ? "Weather feed unavailable"
     : segment.weather_modifier >= 20 ? "Live weather: severe caution"
       : segment.weather_modifier >= 10 ? "Live weather: caution active"
-        : `Live weather: clear · no score lift${segment.weather_precipitation_mm !== undefined ? ` (${segment.weather_precipitation_mm} mm/h)` : ""}`;
+        : `Live weather: clear Â· no score lift${segment.weather_precipitation_mm !== undefined ? ` (${segment.weather_precipitation_mm} mm/h)` : ""}`;
   const traffic = segment.traffic_status === "unavailable" || segment.traffic_level === "unavailable"
     ? "Traffic feed unavailable"
     : `Live traffic: ${segment.traffic_level}${segment.traffic_current_speed_kmh !== undefined ? ` (${segment.traffic_current_speed_kmh} km/h)` : ""}`;
@@ -46,6 +63,7 @@ export default function RouteMap({ segments, alternateSegments, drivePosition, o
 
   return <MapContainer bounds={bounds} center={bounds ? undefined : [17.385, 78.4867]} zoom={bounds ? undefined : 12} style={{ height: "100%", width: "100%" }}>
     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+    <MapResizeHandler />
     {alternatePoints.length > 1 && <Polyline positions={alternatePoints} pathOptions={{ color: "#557A65", weight: 4, opacity: 0.45, dashArray: "10 8" }} />}
     {primaryPoints.length > 1 && <Polyline positions={primaryPoints} pathOptions={{ color: "#D4A234", weight: 8, opacity: 0.92 }} />}
     {segments.map((segment) => <CircleMarker key={segment.segment_id} center={[segment.midpoint.lat, segment.midpoint.lng]} radius={8} pathOptions={{ color: "#fff", weight: 2, fillColor: riskColor(segment.final_score), fillOpacity: 1 }}>
