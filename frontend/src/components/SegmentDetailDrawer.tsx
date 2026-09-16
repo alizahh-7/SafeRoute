@@ -18,6 +18,13 @@ const DRAWER_WIDTH_EXPANDED = "760px";
 const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
   const [expanded, setExpanded] = useState(false);
 
+  const toggleExpanded = () => {
+    setExpanded((prev) => !prev);
+    setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 400);
+  };
+
   return (
     <AnimatePresence>
       {segment && (
@@ -45,7 +52,7 @@ const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
               <div className="flex items-center gap-2">
                 <button
                   className="btn-icon"
-                  onClick={() => setExpanded((prev) => !prev)}
+                  onClick={toggleExpanded}
                   aria-label={expanded ? "Collapse panel" : "Expand panel"}
                   title={expanded ? "Collapse panel" : "Expand panel"}
                 >
