@@ -7,7 +7,7 @@
 // the report *says*, edit riskNarrative.ts, not this file.
 
 import { jsPDF } from "jspdf";
-import type { RouteRiskResponse, RouteSegment } from "../types/route";
+import type { RouteRiskResponse, RouteSegment, SavedCommute } from "../types/route";
 import {
   SCALE_INTRO,
   SCORE_BANDS,
@@ -243,6 +243,97 @@ export function downloadSafetyReport(
       para(band.meaning, 8, MUTED, 1.5, contentWidth - 5.5, margin + 5.5);
       para(`What to do: ${band.action}`, 8, INK, 4, contentWidth - 5.5, margin + 5.5);
     });
+
+    /* ---------- PAGE 1.5 — Quick-reference table ---------- */
+
+  newPage();
+
+  heading("Quick-reference table", 15, 0);
+  para(
+    "A one-glance version of this report — every segment, its score and its live conditions, for a fast check before you leave. The pages that follow explain the reasoning behind each number.",
+    9,
+    MUTED,
+    5
+  );
+
+  if (stats.highest) {
+    report.setFont("helvetica", "bold");
+    report.setFontSize(9.5);
+    setInk(riskColor(stats.highest.final_score));
+    report.text(
+      `Highest-risk segment: ${stats.highest.road_name} (${stats.highest.final_score}/100)`,
+      margin,
+      y + lh(9.5) * 0.72
+    );
+    y += lh(9.5) + 4;
+  }
+
+  const qCols = [
+    { title: "Road name", x: margin, width: contentWidth * 0.4 },
+    { title: "Risk", x: margin + contentWidth * 0.4, width: contentWidth * 0.12 },
+    { title: "Vision severity", x: margin + contentWidth * 0.52, width: contentWidth * 0.18 },
+    { title: "Traffic level", x: margin + contentWidth * 0.7, width: contentWidth * 0.15 },
+    { title: "Active flag", x: margin + contentWidth * 0.85, width: contentWidth * 0.15 },
+  ];
+  const qRowHeight = 6;
+
+  const drawQuickHeader = () => {
+    ensure(qRowHeight + 2);
+    report.setFillColor(GOLD[0], GOLD[1], GOLD[2]);
+    report.rect(margin, y, contentWidth, qRowHeight, "F");
+    report.setFont("helvetica", "bold");
+    report.setFontSize(7.5);
+    setInk(INK);
+    qCols.forEach((c) => report.text(c.title, c.x + 2, y + qRowHeight * 0.68));
+    y += qRowHeight;
+  };
+
+  drawQuickHeader();
+
+  segments.forEach((segment, index) => {
+    if (y + qRowHeight > bottomLimit) {
+      newPage();
+      drawQuickHeader();
+    }
+    if (index % 2 === 0) {
+      report.setFillColor(250, 248, 245);
+      report.rect(margin, y, contentWidth, qRowHeight, "F");
+    }
+    const baseline = y + qRowHeight * 0.68;
+    const flags =
+      [
+        segment.waterlogging_flag ? "Waterlogging" : null,
+        (segment.news_flags?.length ?? 0) > 0 ? "News" : null,
+      ]
+        .filter(Boolean)
+        .join(", ") || "None";
+    const roadName =
+      segment.road_name.length > 46 ? segment.road_name.slice(0, 45) + "…" : segment.road_name;
+
+    report.setFont("helvetica", "normal");
+    report.setFontSize(7.5);
+    setInk(INK);
+    report.text(roadName, qCols[0].x + 2, baseline);
+
+    report.setFont("helvetica", "bold");
+    setInk(riskColor(segment.final_score));
+    report.text(`${segment.final_score}/100`, qCols[1].x + 2, baseline);
+
+    report.setFont("helvetica", "normal");
+    setInk(INK);
+    report.text(segment.vision_severity, qCols[2].x + 2, baseline);
+    report.text(
+      segment.traffic_status === "unavailable" ? "n/a" : segment.traffic_level,
+      qCols[3].x + 2,
+      baseline
+    );
+    report.text(flags, qCols[4].x + 2, baseline);
+
+    y += qRowHeight;
+  });
+
+  y += 4;
+  rule();
 
   /* ---------- PAGE 2 ---------- */
 
@@ -590,3 +681,4 @@ export function downloadSafetyReport(
 
   report.save("SafeRoute-Telangana-Safety-Report.pdf");
 }
+

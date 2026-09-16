@@ -22,6 +22,7 @@ import {
 import { motion } from "framer-motion";
 import { useRouteContext } from "../context/RouteContext";
 import { downloadSafetyReport } from "../services/safetyReport";
+import { downloadSafetyAudit } from "../services/safetyAudit";
 import type {
   RouteSegment,
   SavedCommute,
@@ -723,6 +724,13 @@ function CorridorCard({
 
 type FilterKey = "all" | "favorites" | "recurring" | "elevated";
 
+const FILTER_LABELS: Record<FilterKey, string> = {
+  all: "All monitored corridors",
+  favorites: "Favourite corridors",
+  recurring: "Recurring corridors",
+  elevated: "Elevated-risk corridors",
+};
+
 export default function SavedCorridorsCommuteArchive() {
   const {
     savedCommutes,
@@ -904,9 +912,8 @@ const visibleCommutes = useMemo(() => {
   };
 
   const exportAudit = () => {
-    const target = visibleCommutes[0] ?? savedCommutes[0];
-
-    if (target) exportCommute(target);
+    const scope = visibleCommutes.length ? visibleCommutes : savedCommutes;
+    downloadSafetyAudit(scope, FILTER_LABELS[filter]);
   };
 
   if (!savedCommutes.length) {
