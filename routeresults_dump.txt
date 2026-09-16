@@ -1,4 +1,4 @@
-//frontend/src/pages/RouteResults.tsx
+﻿//frontend/src/pages/RouteResults.tsx
 
 import { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
@@ -64,18 +64,31 @@ const RouteResults = () => {
   const [favoriteCommute, setFavoriteCommute] = useState(false);
   const [recurringCommute, setRecurringCommute] = useState(false);
 
-  const segments = routeData?.segments ?? [];
+  if (loading) return <div className="pt-32 text-center font-body-lg">Analyzing your route with real data...</div>;
+  if (error) return <div className="pt-32 text-center font-body-lg text-error">{error}</div>;
+  if (!routeData) return (
+    <div className="pt-32 text-center font-body-lg flex flex-col items-center gap-space-md">
+      <p>No route yet â€” go plan one first.</p>
+      <Link to="/route-planner" className="btn btn-primary">Go to Route Planner</Link>
+    </div>
+  );
 
+  const { route_total_risk, segments } = routeData;
+  const primaryColor = riskColor(route_total_risk);
+  const hazardCount = segments.filter(s => s.waterlogging_flag || s.news_flags?.length || s.vision_severity !== "none").length;
+  const worstSegment = segments.reduce((worst, s) => !worst || s.final_score > worst.final_score ? s : worst, segments[0]);
+  const showAlternate = alternateData?.alternate_available && alternateData.should_suggest_alternate;
+  const savedCommute = savedCommutes.find((commute) => commute.origin === origin && commute.destination === destination);
   const routePoints = useMemo(() => buildRouteGeometry(segments), [segments]);
 
   const segmentBoundaries = useMemo(() => {
-    let acc = 0;
-    return segments.map((segment) => {
-      const start = acc;
-      acc += segment.coordinates.length;
-      return { segment, start, end: acc };
-    });
-  }, [segments]);
+  let acc = 0;
+  return segments.map((segment) => {
+    const start = acc;
+    acc += segment.coordinates.length;
+    return { segment, start, end: acc };
+  });
+}, [segments]);
 
   const drivePosition: LatLngTuple | null = routePoints[driveIndex] ?? null;
 
@@ -135,22 +148,6 @@ const RouteResults = () => {
     }, 700);
     return () => window.clearInterval(timer);
   }, [driving, routePoints, segmentBoundaries, dismissedIds, voiceOn]);
-
-  if (loading) return <div className="pt-32 text-center font-body-lg">Analyzing your route with real data...</div>;
-  if (error) return <div className="pt-32 text-center font-body-lg text-error">{error}</div>;
-  if (!routeData) return (
-    <div className="pt-32 text-center font-body-lg flex flex-col items-center gap-space-md">
-      <p>No route yet â€” go plan one first.</p>
-      <Link to="/route-planner" className="btn btn-primary">Go to Route Planner</Link>
-    </div>
-  );
-
-  const { route_total_risk } = routeData;
-  const primaryColor = riskColor(route_total_risk);
-  const hazardCount = segments.filter(s => s.waterlogging_flag || s.news_flags?.length || s.vision_severity !== "none").length;
-  const worstSegment = segments.reduce((worst, s) => !worst || s.final_score > worst.final_score ? s : worst, segments[0]);
-  const showAlternate = alternateData?.alternate_available && alternateData.should_suggest_alternate;
-  const savedCommute = savedCommutes.find((commute) => commute.origin === origin && commute.destination === destination);
 
   const stopDrive = () => { setDriving(false); setDriveIndex(0); setDriveAlert(null); setDismissedIds(new Set()); window.speechSynthesis.cancel(); };
   const continueDrive = () => {
@@ -274,7 +271,7 @@ const RouteResults = () => {
           </div>
         </div>
 
-        {saveOpen && <section className="mb-space-xl rounded-xl border border-secondary-container bg-surface-container-low p-space-lg"><div className="flex flex-wrap justify-between gap-space-sm"><div><span className="font-label-caps-micro uppercase text-secondary">Save recurring route</span><h2 className="font-headline-sm mt-space-xs">Build a safety profile for this commute</h2><p className="font-body-sm text-on-surface-variant mt-space-xs">Future â€œCheck Nowâ€ actions will rerun the existing route pipeline and append timestamped safety snapshots on this device.</p></div><button type="button" onClick={() => setSaveOpen(false)} className="font-body-sm">Close</button></div><div className="mt-space-md flex flex-col lg:flex-row gap-space-sm lg:items-end"><label className="flex-1 font-body-sm">Commute name<input value={commuteName} onChange={(event) => setCommuteName(event.target.value)} className="mt-space-xs block w-full rounded-lg border border-surface-variant bg-surface-container-lowest px-space-md py-space-sm" placeholder="Home â†’ College"/></label><label className="inline-flex items-center gap-space-xs font-body-sm"><input type="checkbox" checked={favoriteCommute} onChange={(event) => setFavoriteCommute(event.target.checked)}/><Star size={15} className="text-secondary"/>Favourite</label><label className="inline-flex items-center gap-space-xs font-body-sm"><input type="checkbox" checked={recurringCommute} onChange={(event) => setRecurringCommute(event.target.checked)}/>Recurring commute</label><button type="button" onClick={saveCommute} className="btn btn-primary">{savedCommute ? "Update saved commute" : "Save Commute"}</button></div></section>}
+        {saveOpen && <section className="mb-space-xl rounded-xl border border-secondary-container bg-surface-container-low p-space-lg"><div className="flex flex-wrap justify-between gap-space-sm"><div><span className="font-label-caps-micro uppercase text-secondary">Save recurring route</span><h2 className="font-headline-sm mt-space-xs">Build a safety profile for this commute</h2><p className="font-body-sm text-on-surface-variant mt-space-xs">Future â€œCheck Nowâ€ actions will rerun the existing route pipeline and append timestamped safety snapshots on this device.</p></div><button type="button" onClick={() => setSaveOpen(false)} className="font-body-sm">Close</button></div><div className="mt-space-md flex flex-col lg:flex-row gap-space-sm lg:items-end"><label className="flex-1 font-body-sm">Commute name<input value={commuteName} onChange={(event) => setCommuteName(event.target.value)} className="mt-space-xs block w-full rounded-lg border border-surface-variant bg-surface-container-lowest px-space-md py-space-sm" placeholder="Home â†’ College"/></label><label className="inline-flex items-center gap-space-xs font-body-sm"><input type="checkbox" checked={favoriteCommute} onChange={(event) => setFavoriteCommute(event.target.checked)}/><Star size={15} className="text-secondary"/>Favourite</label><label className="inline-flex items-center gap-space-xs font-body-sm"><input type="checkbox" checked={recurringCommute} onChange={(event) => setRecurringCommute(event.target.checked)}/>Recurring commute</label><button type="button" onClick={saveCommute} className="btn btn-primary">{savedCommute ? "Update saved commute" : "Save Commute"}</button></div></section>}
 
         {alternateData?.alternate_available && (
           <div className="rounded-xl p-space-lg mb-space-xl bg-surface-container-low flex items-center gap-space-sm">
