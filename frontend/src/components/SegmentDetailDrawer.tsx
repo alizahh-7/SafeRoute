@@ -3,6 +3,7 @@ import { useState } from "react";
 import { X, AlertTriangle, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { RouteSegment } from "../types/route";
+import { explainSegment, bandFor, scoreArithmetic } from "../services/riskNarrative";
 import SegmentRiskBadge from "./SegmentRiskBadge";
 import RoadDamageImage from "./RoadDamageImage";
 import "./SegmentDetailDrawer.css";
@@ -72,7 +73,11 @@ const SegmentDetailDrawer = ({ segment, onClose }: Props) => {
                 </div>
                 
                 <div className="stat-number text-center mb-2">{segment.final_score}</div>
-                <p className="text-center text-dark-grey">{segment.explanation}</p>
+                <p className="text-center font-semibold text-dark-grey" style={{ fontSize: '0.8rem' }}>
+                  {bandFor(segment.final_score).band} — {bandFor(segment.final_score).headline}
+                </p>
+                <p className="text-center text-muted mt-1" style={{ fontSize: '0.7rem' }}>{scoreArithmetic(segment)}</p>
+                <p className="text-dark-grey mt-3" style={{ fontSize: '0.8rem', lineHeight: 1.6 }}>{explainSegment(segment)}</p>
                 <p className="text-center text-muted mt-2" style={{ fontSize: '0.75rem' }}>Source: fused route risk pipeline</p>
                 
                 <div className="risk-breakdown mt-6">
