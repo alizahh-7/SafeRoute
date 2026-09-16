@@ -36,6 +36,13 @@ type SessionStats = {
   reroutesAccepted: number;
 };
 
+type PersistedRouteState = {
+  origin: string;
+  destination: string;
+  routeData: RouteRiskResponse | null;
+  alternateData: AlternateRouteResponse | null;
+};
+
 function getPersistedSessionStats(): SessionStats {
   try {
     const saved = localStorage.getItem(SESSION_STATS_KEY);
@@ -51,11 +58,19 @@ function getPersistedSessionStats(): SessionStats {
   }
 }
 
-function getPersistedRouteState() {
+function getPersistedRouteState(): PersistedRouteState | null {
   try {
     const saved = localStorage.getItem(ROUTE_STATE_KEY);
     if (!saved) return null;
-    return JSON.parse(saved) as { origin: string; destination: string; routeData: RouteRiskResponse | null };
+    const parsed = JSON.parse(saved);
+    return {
+      origin: parsed?.origin ?? "",
+      destination: parsed?.destination ?? "",
+      routeData: parsed?.routeData ?? null,
+      // Older persisted payloads (pre-fix) won't have this key — default it so
+      // rehydration doesn't throw for users with stale localStorage.
+      alternateData: parsed?.alternateData ?? null,
+    };
   } catch {
     return null;
   }
@@ -94,7 +109,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   const [origin, setOrigin] = useState(persisted?.origin ?? "");
   const [destination, setDestination] = useState(persisted?.destination ?? "");
   const [routeData, setRouteData] = useState<RouteRiskResponse | null>(persisted?.routeData ?? null);
-  const [alternateData, setAlternateData] = useState<AlternateRouteResponse | null>(null);
+  const [alternateData, setAlternateData] = useState<AlternateRouteResponse | null>(persisted?.alternateData ?? null);
   const [loading, setLoading] = useState(false);
   const [alternateLoading, setAlternateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,9 +122,15 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(SESSION_STATS_KEY, JSON.stringify({ routesAnalyzed, hazardsFlagged, reroutesAccepted }));
   }, [routesAnalyzed, hazardsFlagged, reroutesAccepted]);
 
+  // Single persistence layer for the whole app: whatever page mounts next
+  // (Route Results, Segment Diagnostics, Hazard Advisory, Analytics) reads
+  // this same snapshot back out via getPersistedRouteState() above, so a
+  // refresh looks like nothing happened. Route Planner doesn't render
+  // routeData/alternateData at all, so it's unaffected either way — and a
+  // fresh planRoute() call simply overwrites this entry on its own.
   useEffect(() => {
-    localStorage.setItem(ROUTE_STATE_KEY, JSON.stringify({ origin, destination, routeData }));
-  }, [origin, destination, routeData]);
+    localStorage.setItem(ROUTE_STATE_KEY, JSON.stringify({ origin, destination, routeData, alternateData }));
+  }, [origin, destination, routeData, alternateData]);
 
   useEffect(() => { localStorage.setItem(SAVED_COMMUTES_KEY, JSON.stringify(savedCommutes)); }, [savedCommutes]);
 
@@ -187,92 +208,92 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   }, [routeData, origin, destination, savedCommutes]);
 
   const refreshSavedCommute = useCallback(async (commuteId: string) => {
-  const commute = savedCommutes.find(
-    (item) => item.id === commuteId
-  );
-
-  if (!commute) return false;
-
-  setLoading(true);
-  setError(null);
-  setOrigin(commute.origin);
-  setDestination(commute.destination);
-  setAlternateData(null);
-
-  try {
-    // Run the exact same live safety pipeline used by Route Planner.
-    const result = await fetchRoute(
-      commute.origin,
-      commute.destination
+    const commute = savedCommutes.find(
+      (item) => item.id === commuteId
     );
 
-    // Update the active route immediately.
-    setRouteData(result);
+    if (!commute) return false;
 
-    // Update session statistics.
-    setRoutesAnalyzed((count) => count + 1);
+    setLoading(true);
+    setError(null);
+    setOrigin(commute.origin);
+    setDestination(commute.destination);
+    setAlternateData(null);
 
-    setHazardsFlagged((count) =>
-      count +
-      result.segments.filter(
-        (segment) =>
-          segment.final_score >= 50 ||
-          Boolean(segment.waterlogging_flag) ||
-          Boolean(segment.news_flags?.length)
-      ).length
-    );
+    try {
+      // Run the exact same live safety pipeline used by Route Planner.
+      const result = await fetchRoute(
+        commute.origin,
+        commute.destination
+      );
 
-    // Create a completely new timestamped safety snapshot.
-    const snapshot = makeSnapshot(result);
+      // Update the active route immediately.
+      setRouteData(result);
 
-    // IMPORTANT:
-    // Use the functional state value so the latest Saved Commute
-    // is always updated, even if another state update happened
-    // while the API request was running.
-    setSavedCommutes((currentCommutes) =>
-      currentCommutes.map((item) =>
-        item.id === commuteId
-          ? {
-              ...item,
-              snapshots: [
-                ...item.snapshots,
-                snapshot,
-              ].slice(-MAX_SNAPSHOTS),
-            }
-          : item
+      // Update session statistics.
+      setRoutesAnalyzed((count) => count + 1);
+
+      setHazardsFlagged((count) =>
+        count +
+        result.segments.filter(
+          (segment) =>
+            segment.final_score >= 50 ||
+            Boolean(segment.waterlogging_flag) ||
+            Boolean(segment.news_flags?.length)
+        ).length
+      );
+
+      // Create a completely new timestamped safety snapshot.
+      const snapshot = makeSnapshot(result);
+
+      // IMPORTANT:
+      // Use the functional state value so the latest Saved Commute
+      // is always updated, even if another state update happened
+      // while the API request was running.
+      setSavedCommutes((currentCommutes) =>
+        currentCommutes.map((item) =>
+          item.id === commuteId
+            ? {
+                ...item,
+                snapshots: [
+                  ...item.snapshots,
+                  snapshot,
+                ].slice(-MAX_SNAPSHOTS),
+              }
+            : item
+        )
+      );
+
+      // Refresh alternate route data as well.
+      setAlternateLoading(true);
+
+      fetchAlternateRoute(
+        commute.origin,
+        commute.destination
       )
-    );
+        .then((alternate) => {
+          setAlternateData(alternate);
+        })
+        .catch(() => {
+          setAlternateData(null);
+        })
+        .finally(() => {
+          setAlternateLoading(false);
+        });
 
-    // Refresh alternate route data as well.
-    setAlternateLoading(true);
+      return true;
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Could not refresh this saved commute."
+      );
 
-    fetchAlternateRoute(
-      commute.origin,
-      commute.destination
-    )
-      .then((alternate) => {
-        setAlternateData(alternate);
-      })
-      .catch(() => {
-        setAlternateData(null);
-      })
-      .finally(() => {
-        setAlternateLoading(false);
-      });
-
-    return true;
-  } catch (err) {
-    setError(
-      err instanceof ApiError
-        ? err.message
-        : "Could not refresh this saved commute."
-    );
-
-    return false;
-  } finally {
-    setLoading(false);
-  }
-}, [savedCommutes]);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [savedCommutes]);
 
   const openSavedCommute = useCallback((commuteId: string) => {
     const commute = savedCommutes.find((item) => item.id === commuteId); const snapshot = commute?.snapshots.at(-1);
