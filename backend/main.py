@@ -58,9 +58,9 @@ def score_route(route_coordinates, waterlogging_points, vision_model):
     # These are all independent per-segment network/model calls — run them
     # concurrently instead of one segment at a time. This is the main fix
     # for slow alternate-route checks.
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         segments = list(executor.map(lambda s: apply_real_weather_and_traffic(s, waterlogging_points), segments))
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         segments = list(executor.map(lambda s: apply_real_vision_and_news(s, vision_model), segments))
 
     return fuse_all_segments(segments)
