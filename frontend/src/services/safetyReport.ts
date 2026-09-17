@@ -7,7 +7,7 @@
 // the report *says*, edit riskNarrative.ts, not this file.
 
 import { jsPDF } from "jspdf";
-import type { RouteRiskResponse, RouteSegment, SavedCommute } from "../types/route";
+import type { RouteRiskResponse, RouteSegment } from "../types/route";
 import {
   SCALE_INTRO,
   SCORE_BANDS,
